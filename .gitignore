@@ -1,0 +1,5 @@
+local_bert_model/
+local_vit_model/
+TEMPCVS/
+project_2_venv/
+ignore/
