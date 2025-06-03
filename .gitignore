@@ -4,3 +4,5 @@ TEMPCVS/
 project_2_venv/
 ignore/
 CVS/
+venv/
+*.log
