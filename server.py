@@ -6,7 +6,6 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import os
 import random
-from ignore.fakeData import fake_data  # Import the fake data
 
 os.environ["TRANSFORMERS_OFFLINE"] = "1"  # Force offline mode
 

@@ -13,6 +13,11 @@ import io
 import random
 import re
 import docx  # For reading Word documents
+import warnings
+import logging
+
+# Suppress the overflowing tokens warning
+logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.ERROR)
 
 # Force offline mode to use local models
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -37,8 +42,7 @@ def map_status_to_label(status):
         "ACCEPT": 0,
         "INTERVIEW": 1, 
         "SHORTLIST": 2,
-        "HOLD": 3,
-        "REJECT": 4,
+        "REJECT": 3,
     }
     # Convert to uppercase and get value (default to 0 if not found)
     return status_map.get(status.upper(), 0)  
@@ -59,8 +63,36 @@ def create_page_image(file_path, page_num=0, scale=1.5):
     """
     # Handle PDF files
     if file_path.lower().endswith('.pdf'):
+        doc = None
         try:
-            doc = fitz.open(file_path)
+            # Check if file exists first
+            if not os.path.exists(file_path):
+                print(f"PDF file does not exist: {file_path}")
+                return Image.new('RGB', (224, 224), color='white')
+            
+            # Check if file is readable
+            if not os.access(file_path, os.R_OK):
+                print(f"PDF file is not readable: {file_path}")
+                return Image.new('RGB', (224, 224), color='white')
+            
+            # Try to open the PDF with PyMuPDF
+            try:
+                doc = fitz.open(file_path)
+            except fitz.FileDataError as fde:
+                print(f"PDF file is corrupted or invalid: {file_path} - {str(fde)}")
+                return Image.new('RGB', (224, 224), color='white')
+            except fitz.FileNotFoundError as fnf:
+                print(f"PDF file not found: {file_path} - {str(fnf)}")
+                return Image.new('RGB', (224, 224), color='white')
+            except Exception as open_error:
+                print(f"Cannot open PDF {file_path}: {str(open_error)}")
+                return Image.new('RGB', (224, 224), color='white')
+            
+            # Check if document has pages
+            if len(doc) == 0:
+                print(f"PDF has no pages: {file_path}")
+                doc.close()
+                return Image.new('RGB', (224, 224), color='white')
             
             # Check if page exists
             if page_num >= len(doc):
@@ -69,19 +101,41 @@ def create_page_image(file_path, page_num=0, scale=1.5):
             # Get the page
             page = doc[page_num]
             
-            # Render page to an image (RGB)
-            pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+            # Render page to an image (RGB) with error handling
+            try:
+                pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+            except Exception as render_error:
+                print(f"Error rendering PDF page {page_num} from {file_path}: {str(render_error)}")
+                doc.close()
+                return Image.new('RGB', (224, 224), color='white')
             
             # Convert to PIL Image
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            try:
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            except Exception as img_error:
+                print(f"Error converting PDF page to image from {file_path}: {str(img_error)}")
+                doc.close()
+                return Image.new('RGB', (224, 224), color='white')
             
             # Resize to fit ViT input requirements (224x224)
-            img = img.resize((224, 224), Image.LANCZOS)
+            # Use LANCZOS for backward compatibility with older PIL versions
+            try:
+                img = img.resize((224, 224), Image.Resampling.LANCZOS)
+            except AttributeError:
+                # Fallback for older PIL versions
+                img = img.resize((224, 224), Image.LANCZOS)
             
+            doc.close()
             return img
         
         except Exception as e:
-            print(f"Error creating image from PDF {file_path}: {str(e)}")
+            print(f"Unexpected error creating image from PDF {file_path}: {str(e)}")
+            # Make sure to close the document if it was opened
+            if doc is not None:
+                try:
+                    doc.close()
+                except:
+                    pass
             # Return a blank image in case of error
             return Image.new('RGB', (224, 224), color='white')
     else:
@@ -103,36 +157,104 @@ def extract_text_from_file(file_path):
     file_ext = os.path.splitext(file_path)[1].lower()
     
     try:
+        # Check if file exists
+        if not os.path.exists(file_path):
+            print(f"File does not exist: {file_path}")
+            return f"File not found: {os.path.basename(file_path)}"
+        
+        # Check if file is readable
+        if not os.access(file_path, os.R_OK):
+            print(f"File is not readable: {file_path}")
+            return f"File not readable: {os.path.basename(file_path)}"
+        
         # PDF files
         if file_ext == '.pdf':
-            doc = fitz.open(file_path)
-            text = ""
-            for page in doc:
-                text += page.get_text()
-            return text
+            doc = None
+            try:
+                doc = fitz.open(file_path)
+                text = ""
+                # Extract text from all pages
+                for page_num in range(len(doc)):
+                    try:
+                        page = doc[page_num]
+                        page_text = page.get_text()
+                        text += page_text + "\n"
+                    except Exception as page_error:
+                        print(f"Error reading page {page_num} from {file_path}: {str(page_error)}")
+                        continue
+                
+                # If no text was extracted, try alternative extraction methods
+                if not text.strip():
+                    # Try extracting text blocks
+                    for page_num in range(len(doc)):
+                        try:
+                            page = doc[page_num]
+                            blocks = page.get_text("blocks")
+                            for block in blocks:
+                                if block[6] == 0:  # Text block
+                                    text += block[4] + "\n"
+                        except:
+                            pass
+                
+                doc.close()
+                
+                # If still no text was extracted, return a placeholder
+                if not text.strip():
+                    return f"PDF content could not be extracted from {os.path.basename(file_path)}"
+                
+                return text
+            except fitz.FileDataError as fde:
+                print(f"PDF file is corrupted or invalid: {file_path} - {str(fde)}")
+                return f"Corrupted PDF: {os.path.basename(file_path)}"
+            except fitz.FileNotFoundError as fnf:
+                print(f"PDF file not found: {file_path} - {str(fnf)}")
+                return f"PDF not found: {os.path.basename(file_path)}"
+            except Exception as pdf_error:
+                print(f"Error opening PDF {file_path}: {str(pdf_error)}")
+                return f"Failed to read PDF: {os.path.basename(file_path)}"
+            finally:
+                # Ensure document is closed even if there's an error
+                if doc is not None:
+                    try:
+                        doc.close()
+                    except:
+                        pass
             
         # Text files
         elif file_ext == '.txt':
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                return f.read()
+            try:
+                # Try multiple encodings
+                encodings = ['utf-8', 'latin-1', 'windows-1252', 'ascii']
+                for encoding in encodings:
+                    try:
+                        with open(file_path, 'r', encoding=encoding) as f:
+                            return f.read()
+                    except UnicodeDecodeError:
+                        continue
+                # If all encodings fail, use replace errors
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    return f.read()
+            except Exception as txt_error:
+                print(f"Error reading text file {file_path}: {str(txt_error)}")
+                return f"Failed to read text file: {os.path.basename(file_path)}"
                 
         # Word documents
         elif file_ext in ['.docx', '.doc']:
             try:
                 doc = docx.Document(file_path)
                 return "\n".join([para.text for para in doc.paragraphs])
-            except Exception as e:
-                print(f"Error reading Word document {file_path}: {str(e)}")
-                return f"Failed to read {os.path.basename(file_path)}"
+            except Exception as doc_error:
+                print(f"Error reading Word document {file_path}: {str(doc_error)}")
+                return f"Failed to read Word document: {os.path.basename(file_path)}"
         
-        # Other file types - return empty string
+        # Other file types - return placeholder
         else:
             print(f"Unsupported file type for text extraction: {file_ext}")
-            return f"Unsupported file type: {file_ext}"
+            return f"Unsupported file type {file_ext}: {os.path.basename(file_path)}"
             
     except Exception as e:
         print(f"Error extracting text from {file_path}: {str(e)}")
-        return ""
+        return f"Error reading file: {os.path.basename(file_path)}"
 
 def extract_cv_features(file_path):
     """
@@ -155,47 +277,118 @@ def extract_cv_features(file_path):
     """
     # Only extract detailed features from PDFs
     if file_path.lower().endswith('.pdf'):
+        doc = None
         try:
-            doc = fitz.open(file_path)
+            # Check if file exists
+            if not os.path.exists(file_path):
+                print(f"PDF file does not exist for feature extraction: {file_path}")
+                return {
+                    "font_count": 1,
+                    "text_density": 1,
+                    "bullet_points": 0,
+                    "pages": 1
+                }
+            
+            # Check if file is readable
+            if not os.access(file_path, os.R_OK):
+                print(f"PDF file is not readable for feature extraction: {file_path}")
+                return {
+                    "font_count": 1,
+                    "text_density": 1,
+                    "bullet_points": 0,
+                    "pages": 1
+                }
+            
+            try:
+                doc = fitz.open(file_path)
+            except fitz.FileDataError as fde:
+                print(f"PDF file is corrupted for feature extraction {file_path}: {str(fde)}")
+                return {
+                    "font_count": 1,
+                    "text_density": 1,
+                    "bullet_points": 0,
+                    "pages": 1
+                }
+            except Exception as open_error:
+                print(f"Cannot open PDF for feature extraction {file_path}: {str(open_error)}")
+                return {
+                    "font_count": 1,
+                    "text_density": 1,
+                    "bullet_points": 0,
+                    "pages": 1
+                }
+            
+            # Check if document has pages
+            if len(doc) == 0:
+                print(f"PDF has no pages for feature extraction: {file_path}")
+                doc.close()
+                return {
+                    "font_count": 1,
+                    "text_density": 1,
+                    "bullet_points": 0,
+                    "pages": 1
+                }
             
             # Initialize counters and metrics
             font_counter = {}
             text_blocks = 0
             bullet_points = 0
+            page_count = len(doc)
             
             # Process each page
-            for page_num, page in enumerate(doc):
-                # Extract text blocks
-                blocks = page.get_text("dict")["blocks"]
-                text_blocks += len([b for b in blocks if b["type"] == 0])  # Text blocks
-                
-                # Count different fonts
-                for block in blocks:
-                    if block["type"] == 0:  # Text block
-                        for line in block.get("lines", []):
-                            for span in line.get("spans", []):
-                                font = span.get("font", "unknown")
-                                if font not in font_counter:
-                                    font_counter[font] = 0
-                                font_counter[font] += 1
-                
-                # Count bullet points (rough estimate)
-                text = page.get_text()
-                bullet_points += text.count("•") + text.count("-") + text.count("*")
+            for page_num in range(len(doc)):
+                try:
+                    page = doc[page_num]
+                    
+                    # Extract text blocks
+                    try:
+                        blocks = page.get_text("dict")["blocks"]
+                        text_blocks += len([b for b in blocks if b["type"] == 0])  # Text blocks
+                        
+                        # Count different fonts
+                        for block in blocks:
+                            if block["type"] == 0:  # Text block
+                                for line in block.get("lines", []):
+                                    for span in line.get("spans", []):
+                                        font = span.get("font", "unknown")
+                                        if font not in font_counter:
+                                            font_counter[font] = 0
+                                        font_counter[font] += 1
+                    except Exception as block_error:
+                        print(f"Error extracting blocks from page {page_num} in {file_path}: {str(block_error)}")
+                    
+                    # Count bullet points (rough estimate)
+                    try:
+                        text = page.get_text()
+                        bullet_points += text.count("•") + text.count("-") + text.count("*")
+                    except Exception as text_error:
+                        print(f"Error extracting text from page {page_num} in {file_path}: {str(text_error)}")
+                        
+                except Exception as page_error:
+                    print(f"Error processing page {page_num} in {file_path}: {str(page_error)}")
+                    continue
                 
             # Calculate metrics
-            font_count = len(font_counter)
-            text_density = text_blocks / max(1, len(doc))  # Blocks per page
+            font_count = len(font_counter) if font_counter else 1
+            text_density = text_blocks / max(1, page_count)  # Blocks per page
+            
+            doc.close()
             
             return {
-                "font_count": font_count,
-                "text_density": text_density,
-                "bullet_points": bullet_points,
-                "pages": len(doc)
+                "font_count": max(1, font_count),  # At least 1 font
+                "text_density": max(0.1, text_density),  # At least some density
+                "bullet_points": max(0, bullet_points),  # Non-negative
+                "pages": page_count
             }
             
         except Exception as e:
             print(f"Error extracting features from {file_path}: {str(e)}")
+            # Ensure document is closed even if there's an error
+            if doc is not None:
+                try:
+                    doc.close()
+                except:
+                    pass
             return {
                 "font_count": 1,
                 "text_density": 1,
@@ -239,53 +432,98 @@ def load_cv_data_from_folder_structure(base_dir):
     if not os.path.exists(base_dir):
         raise ValueError(f"Base directory {base_dir} does not exist")
     
+    # Statistics for tracking
+    skipped_files = 0
+    processed_jobs = 0
+    
     # Iterate through job folders
-    for job_dir in os.listdir(base_dir):
+    for job_dir in sorted(os.listdir(base_dir)):
         job_path = os.path.join(base_dir, job_dir)
         
-        # Skip if not a directory
-        if not os.path.isdir(job_path):
+        # Skip if not a directory or hidden
+        if not os.path.isdir(job_path) or job_dir.startswith('.'):
             continue
+        
+        processed_jobs += 1
         
         # Find job description file - look for a file named jobDescription or job_description
         job_description_file = None
-        for file in os.listdir(job_path):
-            file_path = os.path.join(job_path, file)
-            if os.path.isfile(file_path) and not file.startswith('.') and \
-               (file.lower() == 'jobdescription' or 'job_description' in file.lower() or \
-                'jobdescription' in file.lower()):
-                job_description_file = file_path
-                break
-                
-        # If no specific job description file found, try to find any file in the job folder
-        if job_description_file is None:
+        try:
             for file in os.listdir(job_path):
                 file_path = os.path.join(job_path, file)
-                if os.path.isfile(file_path) and not file.startswith('.'):
+                if os.path.isfile(file_path) and not file.startswith('.') and \
+                   (file.lower() == 'jobdescription' or 'job_description' in file.lower() or \
+                    'jobdescription' in file.lower()):
                     job_description_file = file_path
                     break
+                    
+            # If no specific job description file found, try to find any .txt or .docx file
+            if job_description_file is None:
+                for file in os.listdir(job_path):
+                    file_path = os.path.join(job_path, file)
+                    if os.path.isfile(file_path) and not file.startswith('.') and \
+                       (file.endswith('.txt') or file.endswith('.docx')):
+                        job_description_file = file_path
+                        break
+        except Exception as e:
+            print(f"Error reading job directory {job_path}: {str(e)}")
+            continue
                 
+        # Valid status folders
+        valid_statuses = ['ACCEPT', 'INTERVIEW', 'SHORTLIST', 'REJECT']
+        
         # Iterate through status folders
-        for status_dir in os.listdir(job_path):
-            status_path = os.path.join(job_path, status_dir)
-            
-            # Skip if not a directory or if it's a hidden directory
-            if not os.path.isdir(status_path) or status_dir.startswith('.'):
-                continue
-            
-            # Map status folder name to label
-            label = map_status_to_label(status_dir)
-            
-            # Iterate through CV files in the status folder
-            for cv_file in os.listdir(status_path):
-                cv_path = os.path.join(status_path, cv_file)
+        try:
+            for status_dir in os.listdir(job_path):
+                status_path = os.path.join(job_path, status_dir)
                 
-                # Skip directories and hidden files
-                if os.path.isdir(cv_path) or cv_file.startswith('.'):
+                # Skip if not a directory or if it's a hidden directory
+                if not os.path.isdir(status_path) or status_dir.startswith('.'):
                     continue
                 
-                # Add to data list with job description file
-                cv_data.append((cv_path, job_dir, status_dir, label, job_description_file))
+                # Check if it's a valid status folder
+                if status_dir.upper() not in valid_statuses:
+                    print(f"Skipping unknown status folder: {status_dir} in {job_dir}")
+                    continue
+                
+                # Map status folder name to label
+                label = map_status_to_label(status_dir)
+                
+                # Iterate through CV files in the status folder
+                try:
+                    for cv_file in sorted(os.listdir(status_path)):
+                        cv_path = os.path.join(status_path, cv_file)
+                        
+                        # Skip directories and hidden files
+                        if os.path.isdir(cv_path) or cv_file.startswith('.'):
+                            continue
+                        
+                        # Check if it's a supported file type
+                        file_ext = os.path.splitext(cv_file)[1].lower()
+                        supported_exts = ['.pdf', '.txt', '.docx', '.doc']
+                        if file_ext not in supported_exts:
+                            print(f"Skipping unsupported file type: {cv_file}")
+                            skipped_files += 1
+                            continue
+                        
+                        # Verify file is readable
+                        if not os.access(cv_path, os.R_OK):
+                            print(f"Skipping unreadable file: {cv_file}")
+                            skipped_files += 1
+                            continue
+                        
+                        # Add to data list with job description file
+                        cv_data.append((cv_path, job_dir, status_dir, label, job_description_file))
+                except Exception as e:
+                    print(f"Error reading status folder {status_path}: {str(e)}")
+                    continue
+        except Exception as e:
+            print(f"Error processing job folder {job_path}: {str(e)}")
+            continue
+    
+    print(f"\nProcessed {processed_jobs} job folders")
+    print(f"Found {len(cv_data)} CV files")
+    print(f"Skipped {skipped_files} unsupported/unreadable files")
     
     if not cv_data:
         raise ValueError(f"No CV data found in {base_dir}")
@@ -341,6 +579,9 @@ class CVJobDataset(Dataset):
             cv_text = self.cv_text_cache[cv_path]
         else:
             cv_text = extract_text_from_file(cv_path)
+            # Ensure we have some text content
+            if not cv_text or len(cv_text.strip()) < 10:
+                cv_text = f"CV content from {os.path.basename(cv_path)}"
             self.cv_text_cache[cv_path] = cv_text
         
         # Extract job description from saved file (with caching)
@@ -370,6 +611,7 @@ class CVJobDataset(Dataset):
             padding="max_length",
             truncation=True,
             return_tensors="pt",
+            return_overflowing_tokens=False,  # Don't return overflowing tokens
         )
         
         # Get tokenized data
@@ -694,7 +936,7 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
             
             # Visual consistency loss (better visuals = better classes)
             # Normalize labels to [0,1] range for regression loss
-            normalized_labels = 1.0 - (labels.float() / 4.0)  # 0=1.0, 4=0.0
+            normalized_labels = 1.0 - (labels.float() / 3.0)  # 0=1.0, 3=0.0
             visual_loss = F.mse_loss(torch.sigmoid(visual_score), normalized_labels)
             
             # Semantic consistency loss (better matches = better classes)
@@ -807,7 +1049,7 @@ def evaluate_model(model, dataloader, criterion, device):
             classification_loss = criterion(logits, labels)
             
             # Visual and semantic consistency losses
-            normalized_labels = 1.0 - (labels.float() / 4.0)  # 0=1.0, 4=0.0
+            normalized_labels = 1.0 - (labels.float() / 3.0)  # 0=1.0, 3=0.0
             visual_loss = F.mse_loss(torch.sigmoid(visual_score), normalized_labels)
             semantic_loss = F.mse_loss(torch.sigmoid(semantic_score), normalized_labels)
             
@@ -890,6 +1132,7 @@ def predict_cv(model, cv_path, job_name, job_description_file, job_one_hot, bert
         padding="max_length",
         truncation=True,
         return_tensors="pt",
+        return_overflowing_tokens=False,  # Don't return overflowing tokens
     )
     
     # Process image for ViT
@@ -927,8 +1170,7 @@ def predict_cv(model, cv_path, job_name, job_description_file, job_one_hot, bert
             0: "ACCEPT",
             1: "INTERVIEW",
             2: "SHORTLIST", 
-            3: "HOLD",
-            4: "REJECT",
+            3: "REJECT",
         }
         
         status = status_map_reverse.get(pred_class, "Unknown")
@@ -965,6 +1207,8 @@ def main():
     Main function to train the multimodal CV classification model
     """
     print("Initializing multimodal CV classification training...")
+    print(f"PyMuPDF version: {fitz.version[0]}")
+    print(f"PIL version: {Image.__version__ if hasattr(Image, '__version__') else 'Unknown'}")
     
     # Set random seed for reproducibility
     torch.manual_seed(42)
@@ -981,20 +1225,30 @@ def main():
 
     # Load CV data from folder structure
     try:
+        print(f"\nLoading CV data from: {CV_FILES_DIR}")
         cv_data = load_cv_data_from_folder_structure(CV_FILES_DIR)
-        print(f"Loaded {len(cv_data)} CV files for analysis:")
+        print(f"\nSuccessfully loaded {len(cv_data)} CV files for analysis")
         
         # Group by job and status for better overview
         job_status_counts = {}
-        for _, job, status, _ in cv_data:
+        job_totals = {}
+        for _, job, status, _, _ in cv_data:
             key = (job, status)
             job_status_counts[key] = job_status_counts.get(key, 0) + 1
+            job_totals[job] = job_totals.get(job, 0) + 1
         
-        for (job, status), count in sorted(job_status_counts.items()):
-            print(f"  Job: {job}, Status: {status} - {count} CV files")
+        print("\nDataset distribution:")
+        for job in sorted(job_totals.keys()):
+            print(f"\n  {job}: {job_totals[job]} total CVs")
+            for status in ['ACCEPT', 'INTERVIEW', 'SHORTLIST', 'REJECT']:
+                count = job_status_counts.get((job, status), 0)
+                if count > 0:
+                    print(f"    - {status}: {count} CVs")
             
     except Exception as e:
-        print(f"Error loading CV data: {str(e)}")
+        print(f"\nError loading CV data: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return
 
     # Create dataset
@@ -1041,7 +1295,7 @@ def main():
 
     # Initialize model
     print("\nInitializing multimodal model...")
-    num_classes = 5  # Five possible statuses
+    num_classes = 4  # Four possible statuses
     num_jobs = len(dataset.unique_jobs)
     model = MultimodalCVClassifier(VIT_MODEL_PATH, BERT_MODEL_PATH, num_classes, num_jobs)
 

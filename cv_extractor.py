@@ -16,7 +16,8 @@ from datetime import datetime  # For timestamp operations
 from urllib.parse import urlparse  # For parsing URLs
 from pathlib import Path  # For path operations
 import shutil  # For file operations like copying
-from typing import List, Dict, Tuple, Optional  # For type hints
+from typing import List, Dict, Tuple, Optional  # For type hintsimport re
+import re
 
 # Configure logging to track the script's execution
 logging.basicConfig(
@@ -212,12 +213,12 @@ class CVExtractor:
                     "s3Url",  -- S3 URL of the CV file
                     "fileName",  -- Name of the file
                     "contentType",  -- Content type of file (application/pdf, etc.)
-                    "dateAdded"  -- Date when file was added
+                    "createdAt"  -- Date when file was added
                 FROM "BullhornFile"  -- Bullhorn file table
                 WHERE "bullhornCandidateId" = %s  -- Filter by candidate ID
                 AND "contentType" IN ('application/pdf', 'application/msword', 
                                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document')  -- Only get CV files
-                ORDER BY "dateAdded" DESC  -- Get the most recent file
+                ORDER BY "createdAt" DESC  -- Get the most recent file
                 LIMIT 1  -- Only get the latest CV
                 """
                 
@@ -312,18 +313,32 @@ class CVExtractor:
                 logger.warning(f"No publicDescription or description found for job ID: {job_description['bullhornId']}")
                 return
             
+            # Remove HTML tags from the description
+            # First, replace common HTML entities
+            job_desc_text = job_desc_text.replace('&nbsp;', ' ')
+            job_desc_text = job_desc_text.replace('&amp;', '&')
+            job_desc_text = job_desc_text.replace('&lt;', '<')
+            job_desc_text = job_desc_text.replace('&gt;', '>')
+            job_desc_text = job_desc_text.replace('&quot;', '"')
+            job_desc_text = job_desc_text.replace('&#39;', "'")
+            
+            # Remove HTML tags using regex
+            
+            job_desc_text = re.sub('<.*?>', '', job_desc_text)
+            
+            # Clean up extra whitespace
+            job_desc_text = re.sub(r'\s+', ' ', job_desc_text).strip()
+            
+            # Get the job title
+            job_title = job_description.get('title', 'N/A')
+            
             # Create filename for the job description
             jd_filename = "job_description.txt"
             jd_path = os.path.join(job_folder_path, jd_filename)
             
-            # Write the job description to text file
+            # Write only title and description to text file
             with open(jd_path, 'w', encoding='utf-8') as file:
-                file.write(f"Job Title: {job_description.get('title', 'N/A')}\n")
-                file.write(f"Company: {job_description.get('clientCorporationName', 'N/A')}\n")
-                file.write(f"Job ID: {job_description.get('bullhornId', 'N/A')}\n")
-                file.write(f"Date Added: {job_description.get('dateAdded', 'N/A')}\n")
-                file.write("-" * 50 + "\n\n")
-                file.write("JOB DESCRIPTION:\n\n")
+                file.write(f"{job_title}\n\n")
                 file.write(job_desc_text)
             
             # Log successful save
@@ -484,7 +499,7 @@ def main():
     # Option 1: Single job processing
     # Replace 123 with the actual bullhornJobId you want to process
     # This need to be the bullhornId for the bullHornJob not the id
-    job_description_id = 261  # Example: 456789
+    job_description_id = 250  # Example: 456789
     
     # Option 2: Multiple jobs processing (uncomment to use)
     # job_ids = [123, 124, 125]  # List of bullhornJobIds to process
