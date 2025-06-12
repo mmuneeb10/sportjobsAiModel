@@ -259,15 +259,11 @@ class AdvancedRecruitmentModel:
         
         # Train each model
         for name, model in self.models.items():
-            print(f"Training {name}...")
             model.fit(X_train_scaled, y_train)
             
             # Cross-validation score only if we have enough samples
             if cv_folds and cv_folds >= 2:
                 scores = cross_val_score(model, X_train_scaled, y_train, cv=cv_folds)
-                print(f"{name} CV Score: {scores.mean():.3f} (+/- {scores.std() * 2:.3f})")
-            else:
-                print(f"{name} trained (insufficient samples for cross-validation)")
     
     def train_neural_network(self, X_train: np.ndarray, y_train: np.ndarray, 
                            epochs: int = 100, batch_size: int = 32):
@@ -302,9 +298,6 @@ class AdvancedRecruitmentModel:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            
-            if epoch % 20 == 0:
-                print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
     
     def predict_ensemble(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Make predictions using ensemble voting"""
@@ -312,7 +305,6 @@ class AdvancedRecruitmentModel:
         try:
             X_scaled = self.scaler.transform(X)
         except Exception as e:
-            print(f"Warning: Scaler not fitted. Using unscaled features. Error: {e}")
             X_scaled = X
         
         # Get predictions from all models
@@ -327,11 +319,10 @@ class AdvancedRecruitmentModel:
                 predictions.append(pred)
                 probabilities.append(prob)
             else:
-                print(f"Warning: Model {name} is not fitted yet.")
+                pass
         
         # Check if any models were fitted
         if not predictions:
-            print("Error: No fitted models available. Please train the model first.")
             # Return default predictions
             return np.array([0]), np.array([[0.25, 0.25, 0.25, 0.25]])
         
@@ -408,8 +399,6 @@ class AdvancedRecruitmentModel:
         # Save neural network
         if self.neural_net:
             torch.save(self.neural_net.state_dict(), model_path / "neural_net.pth")
-        
-        print(f"Models saved to {model_path}")
     
     def load_model(self, path: str):
         """Load saved models"""
@@ -425,8 +414,6 @@ class AdvancedRecruitmentModel:
         scaler_file = model_path / "scaler.pkl"
         if scaler_file.exists():
             self.scaler = joblib.load(scaler_file)
-        
-        print("Models loaded successfully")
 
 
 class RecruitmentPipeline:
@@ -439,10 +426,8 @@ class RecruitmentPipeline:
         # Try to load existing model
         try:
             self.model.load_model(model_path)
-            print(f"Loaded model from {model_path}")
         except Exception as e:
-            print(f"Warning: Could not load model from {model_path}. Using untrained model.")
-            print(f"Please train the model first using: python train_recruitment_model.py")
+            pass
         
     def process_new_application(self, cv_path: str, job_desc_path: str) -> Dict:
         """Process new job application"""

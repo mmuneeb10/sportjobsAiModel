@@ -752,3 +752,57 @@ Top 10 Most Important Features:
 2025-06-12 02:22:19,280 - INFO - Training completed successfully!
 2025-06-12 02:22:19,280 - INFO - Overall accuracy: 65.79%
 2025-06-12 02:22:19,280 - INFO - ==================================================
+2025-06-12 02:51:02,319 - INFO - ==================================================
+2025-06-12 02:51:02,320 - INFO - Starting Recruitment AI Training Pipeline
+2025-06-12 02:51:02,320 - INFO - ==================================================
+2025-06-12 02:51:02,320 - INFO - Loading data from jobs
+2025-06-12 02:51:47,636 - INFO - Loaded 378 CV samples
+2025-06-12 02:51:47,664 - INFO - Stage distribution:
+stage
+REJECT       252
+SHORTLIST     85
+INTERVIEW     34
+ACCEPT         7
+Name: count, dtype: int64
+2025-06-12 02:51:47,664 - INFO - Preparing features...
+2025-06-12 02:51:48,947 - INFO - Feature shape: (378, 15)
+2025-06-12 02:51:48,947 - INFO - Label distribution: [252  85  34   7]
+2025-06-12 02:51:48,948 - INFO - Starting model training...
+2025-06-12 02:51:48,948 - INFO - Minimum samples per class: 7
+2025-06-12 02:51:48,950 - INFO - Training set: (302, 15), Test set: (76, 15)
+2025-06-12 02:51:48,951 - INFO - Training ensemble models...
+2025-06-12 02:51:53,041 - INFO - Evaluating models...
+2025-06-12 02:51:53,099 - INFO - Classes found in data: [0 1 2 3]
+2025-06-12 02:51:53,106 - INFO - Using stage names: ['REJECT', 'SHORTLIST', 'INTERVIEW', 'ACCEPT']
+2025-06-12 02:51:53,113 - INFO - 
+Classification Report:
+2025-06-12 02:51:53,117 - INFO -               precision    recall  f1-score   support
+
+      REJECT       0.70      0.94      0.80        51
+   SHORTLIST       0.33      0.12      0.17        17
+   INTERVIEW       0.00      0.00      0.00         7
+      ACCEPT       0.00      0.00      0.00         1
+
+    accuracy                           0.66        76
+   macro avg       0.26      0.26      0.24        76
+weighted avg       0.54      0.66      0.58        76
+
+2025-06-12 02:51:53,373 - INFO - Analyzing feature importance...
+2025-06-12 02:51:53,384 - INFO - 
+Top 10 Most Important Features:
+2025-06-12 02:51:53,385 - INFO - 1. Text Similarity: 0.2424
+2025-06-12 02:51:53,385 - INFO - 2. Total Skills: 0.1554
+2025-06-12 02:51:53,385 - INFO - 3. Industry Keywords: 0.1264
+2025-06-12 02:51:53,386 - INFO - 4. Experience Years: 0.1067
+2025-06-12 02:51:53,386 - INFO - 5. Experience Ratio: 0.1018
+2025-06-12 02:51:53,386 - INFO - 6. Certifications: 0.0760
+2025-06-12 02:51:53,386 - INFO - 7. Achievements: 0.0744
+2025-06-12 02:51:53,386 - INFO - 8. Communication Score: 0.0679
+2025-06-12 02:51:53,387 - INFO - 9. Location Match: 0.0205
+2025-06-12 02:51:53,387 - INFO - 10. Education Level: 0.0132
+2025-06-12 02:51:53,485 - INFO - Saving results...
+2025-06-12 02:51:53,664 - INFO - Results saved successfully!
+2025-06-12 02:51:53,664 - INFO - ==================================================
+2025-06-12 02:51:53,664 - INFO - Training completed successfully!
+2025-06-12 02:51:53,664 - INFO - Overall accuracy: 65.79%
+2025-06-12 02:51:53,664 - INFO - ==================================================

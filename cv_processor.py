@@ -78,12 +78,10 @@ class CVProcessor:
                         if page_text:
                             text += page_text + "\n"
                     except Exception as page_error:
-                        print(f"Warning: Could not extract text from page {page_num + 1}: {page_error}")
                         continue
                         
         except Exception as e:
-            print(f"Error reading PDF {pdf_path}: {e}")
-            print("Attempting alternative extraction method...")
+            pass
             
             # Try alternative method using PyPDF2 with different approach
             try:
@@ -100,28 +98,22 @@ class CVProcessor:
                             continue
                             
             except Exception as alt_error:
-                print(f"Alternative extraction also failed: {alt_error}")
+                pass
                 
                 # Try pdfplumber as last resort
                 try:
                     import pdfplumber
-                    print("Trying pdfplumber...")
                     with pdfplumber.open(pdf_path) as pdf:
                         for page in pdf.pages:
                             page_text = page.extract_text()
                             if page_text:
                                 text += page_text + "\n"
-                    print("Successfully extracted text using pdfplumber")
                 except Exception as plumber_error:
-                    print(f"pdfplumber also failed: {plumber_error}")
                     # Return empty string if all methods fail
                     text = ""
                 
         # Clean up text
         text = text.strip()
-        if not text:
-            print(f"Warning: No text could be extracted from {pdf_path}")
-            
         return text
     
     def _extract_docx_text(self, docx_path: str) -> str:
@@ -169,14 +161,14 @@ class CVProcessor:
             text = "\n".join(text_parts)
             
         except Exception as e:
-            print(f"Error reading DOCX {docx_path}: {e}")
+            pass
             
             # Try alternative method using zipfile for corrupted docx files
             try:
                 import zipfile
                 import xml.etree.ElementTree as ET
                 
-                print(f"Attempting alternative extraction for {docx_path}...")
+                pass
                 
                 with zipfile.ZipFile(docx_path, 'r') as zip_file:
                     # List available files in the archive
@@ -207,7 +199,6 @@ class CVProcessor:
                                             alt_text_parts = [elem.text for elem in text_elements if elem.text]
                                             text = " ".join(alt_text_parts)
                                             if text:
-                                                print(f"Successfully extracted text using alternative method from {doc_path}")
                                                 doc_found = True
                                                 break
                                     except:
@@ -217,7 +208,6 @@ class CVProcessor:
                                     break
                                     
                             except Exception as xml_error:
-                                print(f"XML extraction from {doc_path} failed: {xml_error}")
                                 continue
                     
                     if not doc_found:
@@ -234,20 +224,15 @@ class CVProcessor:
                                     extracted_text = ' '.join([match.strip() for match in text_matches if match.strip() and len(match.strip()) > 2])
                                     if len(extracted_text) > 50:  # Only use if we got meaningful text
                                         text = extracted_text
-                                        print(f"Extracted text using fallback method from {file_name}")
                                         break
                                 except:
                                     continue
                         
             except Exception as alt_error:
-                print(f"Alternative DOCX extraction failed: {alt_error}")
                 text = ""
         
         # Clean up text
         text = text.strip()
-        if not text:
-            print(f"Warning: No text could be extracted from {docx_path}")
-            
         return text
     
     def _extract_doc_text(self, doc_path: str) -> str:
@@ -267,12 +252,11 @@ class CVProcessor:
             import docx2txt
             text = docx2txt.process(doc_path)
             if text.strip():
-                print(f"Successfully extracted text from {doc_path} using docx2txt")
                 return text
         except ImportError:
-            print("docx2txt not installed. Trying alternative methods...")
+            pass
         except Exception as e:
-            print(f"docx2txt failed for {doc_path}: {e}")
+            pass
         
         try:
             # Try using olefile for older .doc format
@@ -309,12 +293,11 @@ class CVProcessor:
                 ole.close()
                 
                 if text.strip():
-                    print(f"Successfully extracted text from {doc_path} using olefile")
                     return text
         except ImportError:
-            print("olefile not installed.")
+            pass
         except Exception as e:
-            print(f"olefile extraction failed for {doc_path}: {e}")
+            pass
         
         try:
             # Try using win32com if on Windows
@@ -328,7 +311,6 @@ class CVProcessor:
                 doc.Close()
                 word.Quit()
                 if text.strip():
-                    print(f"Successfully extracted text from {doc_path} using win32com")
                     return text
         except:
             pass
@@ -339,7 +321,6 @@ class CVProcessor:
             result = subprocess.run(['antiword', doc_path], capture_output=True, text=True)
             if result.returncode == 0 and result.stdout.strip():
                 text = result.stdout
-                print(f"Successfully extracted text from {doc_path} using antiword")
                 return text
         except:
             pass
@@ -350,7 +331,6 @@ class CVProcessor:
             result = subprocess.run(['catdoc', doc_path], capture_output=True, text=True)
             if result.returncode == 0 and result.stdout.strip():
                 text = result.stdout
-                print(f"Successfully extracted text from {doc_path} using catdoc")
                 return text
         except:
             pass
@@ -361,7 +341,6 @@ class CVProcessor:
             result = subprocess.run(['wvText', doc_path, '-'], capture_output=True, text=True)
             if result.returncode == 0 and result.stdout.strip():
                 text = result.stdout
-                print(f"Successfully extracted text from {doc_path} using wvText")
                 return text
         except:
             pass
@@ -371,13 +350,11 @@ class CVProcessor:
             import textract
             text = textract.process(doc_path).decode('utf-8')
             if text.strip():
-                print(f"Successfully extracted text from {doc_path} using textract")
                 return text
         except:
             pass
         
-        # If all methods fail, return empty string and log as skipped
-        print(f"Warning: Could not extract text from .doc file {doc_path}. File will be skipped.")
+        # If all methods fail, return empty string
         return ""
     
     def _extract_contact_info(self, text: str) -> Dict:
@@ -684,7 +661,6 @@ class BatchCVProcessor:
                 if cv_file.suffix.lower() in self.cv_processor.supported_formats:
                     # Basic file validation
                     if not cv_file.is_file() or cv_file.stat().st_size == 0:
-                        print(f"Skipping {cv_file}: File is empty or not a regular file")
                         files_skipped += 1
                         continue
                     
@@ -699,21 +675,13 @@ class BatchCVProcessor:
                             all_cv_data.append(cv_data)
                             files_processed += 1
                         else:
-                            print(f"Skipping {cv_file}: No text could be extracted")
                             files_skipped += 1
                             
                     except Exception as e:
-                        print(f"Error processing {cv_file}: {e}")
-                        print(f"Continuing with next file...")
                         files_failed += 1
         
-        # Print processing summary
+        # Processing summary
         total_files = files_processed + files_skipped + files_failed
-        print(f"\nJob folder processing summary for {job_folder.name}:")
-        print(f"  Total files found: {total_files}")
-        print(f"  Successfully processed: {files_processed}")
-        print(f"  Skipped (no text/empty): {files_skipped}")
-        print(f"  Failed (errors): {files_failed}")
         
         # Convert to DataFrame
         df = pd.DataFrame(all_cv_data)
@@ -730,7 +698,7 @@ class BatchCVProcessor:
                     df = self.process_job_folder(str(job_folder))
                     all_data.append(df)
                 except Exception as e:
-                    print(f"Error processing job folder {job_folder}: {e}")
+                    pass
         
         if all_data:
             return pd.concat(all_data, ignore_index=True)
