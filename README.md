@@ -27,10 +27,13 @@ This system analyzes CVs against job descriptions and predicts which recruitment
 
 ## Installation
 
+python3 -m venv venv 
+source venv/bin/activate
+
 1. Clone the repository
 2. Install dependencies:
 ```bash
-pip install -r requirements.txt --break-system-packages
+pip install -r requirements.txt
 ```
 
 ## Project Structure

@@ -8,3 +8,4 @@ jobs/
 data/
 .claude
 __pycache__
+venv
