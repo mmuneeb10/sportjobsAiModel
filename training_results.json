@@ -1,87 +1,87 @@
 {
-  "accuracy": 0.6296296296296297,
+  "accuracy": 0.6578947368421053,
   "classification_report": {
     "REJECT": {
-      "precision": 0.68,
-      "recall": 0.9444444444444444,
-      "f1-score": 0.7906976744186046,
-      "support": 36.0
+      "precision": 0.6956521739130435,
+      "recall": 0.9411764705882353,
+      "f1-score": 0.8,
+      "support": 51.0
     },
     "SHORTLIST": {
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1-score": 0.0,
-      "support": 10.0
+      "precision": 0.3333333333333333,
+      "recall": 0.11764705882352941,
+      "f1-score": 0.17391304347826086,
+      "support": 17.0
     },
     "INTERVIEW": {
       "precision": 0.0,
       "recall": 0.0,
       "f1-score": 0.0,
-      "support": 6.0
+      "support": 7.0
     },
     "ACCEPT": {
       "precision": 0.0,
       "recall": 0.0,
       "f1-score": 0.0,
-      "support": 2.0
+      "support": 1.0
     },
-    "accuracy": 0.6296296296296297,
+    "accuracy": 0.6578947368421053,
     "macro avg": {
-      "precision": 0.17,
-      "recall": 0.2361111111111111,
-      "f1-score": 0.19767441860465115,
-      "support": 54.0
+      "precision": 0.2572463768115942,
+      "recall": 0.2647058823529412,
+      "f1-score": 0.24347826086956523,
+      "support": 76.0
     },
     "weighted avg": {
-      "precision": 0.45333333333333337,
-      "recall": 0.6296296296296297,
-      "f1-score": 0.5271317829457364,
-      "support": 54.0
+      "precision": 0.5413806254767353,
+      "recall": 0.6578947368421053,
+      "f1-score": 0.5757437070938216,
+      "support": 76.0
     }
   },
   "confusion_matrix": [
     [
-      34,
+      48,
+      2,
+      1,
+      0
+    ],
+    [
+      15,
       2,
       0,
       0
     ],
     [
-      10,
-      0,
-      0,
-      0
-    ],
-    [
-      4,
-      2,
+      6,
+      1,
       0,
       0
     ],
     [
-      2,
       0,
+      1,
       0,
       0
     ]
   ],
-  "training_samples": 216,
-  "test_samples": 54,
+  "training_samples": 302,
+  "test_samples": 76,
   "feature_importance": {
-    "Text Similarity": 0.23573889855945165,
-    "Experience Years": 0.11886815554372318,
-    "Experience Ratio": 0.11976558591142665,
-    "Meets Experience": 0.009847174188817611,
+    "Text Similarity": 0.24235516411412042,
+    "Experience Years": 0.10668598025883567,
+    "Experience Ratio": 0.1018369793865393,
+    "Meets Experience": 0.011914940435886737,
     "Skill Match Ratio": 0.0,
     "Skill Coverage": 0.0,
-    "Total Skills": 0.15000038759955675,
+    "Total Skills": 0.15538493651206775,
     "Matching Skills": 0.0,
-    "Education Level": 0.017323876742918003,
-    "Certifications": 0.07715133283810956,
-    "Industry Keywords": 0.1395795091686228,
-    "Communication Score": 0.07623195705852688,
-    "Achievements": 0.04740122416476549,
-    "Languages": 0.007933801566568768,
-    "Location Match": 0.00015809665751255212
+    "Education Level": 0.01322945330221454,
+    "Certifications": 0.07602661218175108,
+    "Industry Keywords": 0.12638884597525846,
+    "Communication Score": 0.06785729045510087,
+    "Achievements": 0.07438836950149735,
+    "Languages": 0.0034593268504490246,
+    "Location Match": 0.020472101026278708
   }
 }

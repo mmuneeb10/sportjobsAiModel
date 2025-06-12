@@ -30,7 +30,7 @@ This system analyzes CVs against job descriptions and predicts which recruitment
 1. Clone the repository
 2. Install dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt --break-system-packages
 ```
 
 ## Project Structure

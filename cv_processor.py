@@ -25,8 +25,10 @@ class CVProcessor:
         # Extract text based on file format
         if file_path.suffix.lower() == '.pdf':
             text = self._extract_pdf_text(cv_path)
-        elif file_path.suffix.lower() in ['.docx', '.doc']:
+        elif file_path.suffix.lower() == '.docx':
             text = self._extract_docx_text(cv_path)
+        elif file_path.suffix.lower() == '.doc':
+            text = self._extract_doc_text(cv_path)
         elif file_path.suffix.lower() == '.txt':
             with open(cv_path, 'r', encoding='utf-8') as f:
                 text = f.read()
@@ -247,6 +249,136 @@ class CVProcessor:
             print(f"Warning: No text could be extracted from {docx_path}")
             
         return text
+    
+    def _extract_doc_text(self, doc_path: str) -> str:
+        """Extract text from DOC file (older format)"""
+        text = ""
+        
+        try:
+            # First try with python-docx which sometimes works for .doc files
+            text = self._extract_docx_text(doc_path)
+            if text.strip():
+                return text
+        except:
+            pass
+        
+        try:
+            # Try using docx2txt which has better .doc support
+            import docx2txt
+            text = docx2txt.process(doc_path)
+            if text.strip():
+                print(f"Successfully extracted text from {doc_path} using docx2txt")
+                return text
+        except ImportError:
+            print("docx2txt not installed. Trying alternative methods...")
+        except Exception as e:
+            print(f"docx2txt failed for {doc_path}: {e}")
+        
+        try:
+            # Try using olefile for older .doc format
+            import olefile
+            import struct
+            
+            ole = olefile.OleFileIO(doc_path)
+            
+            # Try to find Word Document stream
+            if ole.exists('WordDocument'):
+                stream = ole.openstream('WordDocument')
+                content = stream.read()
+                
+                # Extract text from the stream (basic extraction)
+                # This is a simplified approach - real .doc parsing is complex
+                extracted_parts = []
+                
+                # Try to find readable text in the binary content
+                current_text = b''
+                for byte in content:
+                    if 32 <= byte <= 126:  # Printable ASCII range
+                        current_text += bytes([byte])
+                    else:
+                        if len(current_text) > 3:  # Only keep text chunks longer than 3 chars
+                            try:
+                                decoded = current_text.decode('ascii', errors='ignore')
+                                if decoded.strip():
+                                    extracted_parts.append(decoded)
+                            except:
+                                pass
+                        current_text = b''
+                
+                text = ' '.join(extracted_parts)
+                ole.close()
+                
+                if text.strip():
+                    print(f"Successfully extracted text from {doc_path} using olefile")
+                    return text
+        except ImportError:
+            print("olefile not installed.")
+        except Exception as e:
+            print(f"olefile extraction failed for {doc_path}: {e}")
+        
+        try:
+            # Try using win32com if on Windows
+            import platform
+            if platform.system() == 'Windows':
+                import win32com.client
+                word = win32com.client.Dispatch("Word.Application")
+                word.Visible = False
+                doc = word.Documents.Open(doc_path)
+                text = doc.Range().Text
+                doc.Close()
+                word.Quit()
+                if text.strip():
+                    print(f"Successfully extracted text from {doc_path} using win32com")
+                    return text
+        except:
+            pass
+        
+        try:
+            # Try using subprocess with antiword (if installed)
+            import subprocess
+            result = subprocess.run(['antiword', doc_path], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                text = result.stdout
+                print(f"Successfully extracted text from {doc_path} using antiword")
+                return text
+        except:
+            pass
+        
+        try:
+            # Try using subprocess with catdoc (if installed)
+            import subprocess
+            result = subprocess.run(['catdoc', doc_path], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                text = result.stdout
+                print(f"Successfully extracted text from {doc_path} using catdoc")
+                return text
+        except:
+            pass
+        
+        try:
+            # Try using subprocess with wvText (if installed)
+            import subprocess
+            result = subprocess.run(['wvText', doc_path, '-'], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                text = result.stdout
+                print(f"Successfully extracted text from {doc_path} using wvText")
+                return text
+        except:
+            pass
+        
+        try:
+            # Last resort: try to extract with textract
+            import textract
+            text = textract.process(doc_path).decode('utf-8')
+            if text.strip():
+                print(f"Successfully extracted text from {doc_path} using textract")
+                return text
+        except:
+            pass
+        
+        # If all methods fail, return empty string and log as skipped
+        print(f"Warning: Could not extract text from .doc file {doc_path}. File will be skipped.")
+        return ""
     
     def _extract_contact_info(self, text: str) -> Dict:
         """Extract contact information"""
