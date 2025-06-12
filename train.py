@@ -25,7 +25,7 @@ os.environ["TRANSFORMERS_OFFLINE"] = "1"
 # Paths to local models
 VIT_MODEL_PATH = "./local_vit_model"
 BERT_MODEL_PATH = "./local_bert_model"
-CV_FILES_DIR = "./CVS"
+CV_FILES_DIR = "./updatedCvs"
 
 # Define status/label mapping 
 def map_status_to_label(status):
@@ -67,30 +67,24 @@ def create_page_image(file_path, page_num=0, scale=1.5):
         try:
             # Check if file exists first
             if not os.path.exists(file_path):
-                print(f"PDF file does not exist: {file_path}")
                 return Image.new('RGB', (224, 224), color='white')
             
             # Check if file is readable
             if not os.access(file_path, os.R_OK):
-                print(f"PDF file is not readable: {file_path}")
                 return Image.new('RGB', (224, 224), color='white')
             
             # Try to open the PDF with PyMuPDF
             try:
                 doc = fitz.open(file_path)
             except fitz.FileDataError as fde:
-                print(f"PDF file is corrupted or invalid: {file_path} - {str(fde)}")
                 return Image.new('RGB', (224, 224), color='white')
             except fitz.FileNotFoundError as fnf:
-                print(f"PDF file not found: {file_path} - {str(fnf)}")
                 return Image.new('RGB', (224, 224), color='white')
             except Exception as open_error:
-                print(f"Cannot open PDF {file_path}: {str(open_error)}")
                 return Image.new('RGB', (224, 224), color='white')
             
             # Check if document has pages
             if len(doc) == 0:
-                print(f"PDF has no pages: {file_path}")
                 doc.close()
                 return Image.new('RGB', (224, 224), color='white')
             
@@ -105,7 +99,6 @@ def create_page_image(file_path, page_num=0, scale=1.5):
             try:
                 pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
             except Exception as render_error:
-                print(f"Error rendering PDF page {page_num} from {file_path}: {str(render_error)}")
                 doc.close()
                 return Image.new('RGB', (224, 224), color='white')
             
@@ -113,7 +106,6 @@ def create_page_image(file_path, page_num=0, scale=1.5):
             try:
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             except Exception as img_error:
-                print(f"Error converting PDF page to image from {file_path}: {str(img_error)}")
                 doc.close()
                 return Image.new('RGB', (224, 224), color='white')
             
@@ -129,7 +121,6 @@ def create_page_image(file_path, page_num=0, scale=1.5):
             return img
         
         except Exception as e:
-            print(f"Unexpected error creating image from PDF {file_path}: {str(e)}")
             # Make sure to close the document if it was opened
             if doc is not None:
                 try:
@@ -159,12 +150,10 @@ def extract_text_from_file(file_path):
     try:
         # Check if file exists
         if not os.path.exists(file_path):
-            print(f"File does not exist: {file_path}")
             return f"File not found: {os.path.basename(file_path)}"
         
         # Check if file is readable
         if not os.access(file_path, os.R_OK):
-            print(f"File is not readable: {file_path}")
             return f"File not readable: {os.path.basename(file_path)}"
         
         # PDF files
@@ -180,7 +169,6 @@ def extract_text_from_file(file_path):
                         page_text = page.get_text()
                         text += page_text + "\n"
                     except Exception as page_error:
-                        print(f"Error reading page {page_num} from {file_path}: {str(page_error)}")
                         continue
                 
                 # If no text was extracted, try alternative extraction methods
@@ -204,13 +192,10 @@ def extract_text_from_file(file_path):
                 
                 return text
             except fitz.FileDataError as fde:
-                print(f"PDF file is corrupted or invalid: {file_path} - {str(fde)}")
                 return f"Corrupted PDF: {os.path.basename(file_path)}"
             except fitz.FileNotFoundError as fnf:
-                print(f"PDF file not found: {file_path} - {str(fnf)}")
                 return f"PDF not found: {os.path.basename(file_path)}"
             except Exception as pdf_error:
-                print(f"Error opening PDF {file_path}: {str(pdf_error)}")
                 return f"Failed to read PDF: {os.path.basename(file_path)}"
             finally:
                 # Ensure document is closed even if there's an error
@@ -235,7 +220,6 @@ def extract_text_from_file(file_path):
                 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                     return f.read()
             except Exception as txt_error:
-                print(f"Error reading text file {file_path}: {str(txt_error)}")
                 return f"Failed to read text file: {os.path.basename(file_path)}"
                 
         # Word documents
@@ -244,16 +228,72 @@ def extract_text_from_file(file_path):
                 doc = docx.Document(file_path)
                 return "\n".join([para.text for para in doc.paragraphs])
             except Exception as doc_error:
-                print(f"Error reading Word document {file_path}: {str(doc_error)}")
                 return f"Failed to read Word document: {os.path.basename(file_path)}"
+        
+        # PowerPoint presentations
+        elif file_ext == '.pptx':
+            try:
+                from pptx import Presentation
+                prs = Presentation(file_path)
+                text = []
+                for slide in prs.slides:
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text"):
+                            text.append(shape.text)
+                return "\n".join(text)
+            except:
+                return f"Failed to read PowerPoint: {os.path.basename(file_path)}"
+        
+        # OpenDocument Text
+        elif file_ext == '.odt':
+            try:
+                from odf import text, teletype
+                from odf.opendocument import load
+                doc = load(file_path)
+                allparas = doc.getElementsByType(text.P)
+                return "\n".join([teletype.extractText(p) for p in allparas])
+            except:
+                return f"Failed to read ODT: {os.path.basename(file_path)}"
+        
+        # Email files
+        elif file_ext == '.eml':
+            try:
+                import email
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    msg = email.message_from_file(f)
+                    # Extract body
+                    body = ""
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            body += part.get_payload(decode=True).decode('utf-8', errors='replace')
+                    return body if body else f"No text content in email: {os.path.basename(file_path)}"
+            except:
+                return f"Failed to read email: {os.path.basename(file_path)}"
+        
+        # MHTML files
+        elif file_ext == '.mht':
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                    # Basic extraction - remove HTML tags
+                    text = re.sub('<.*?>', '', content)
+                    return text
+            except:
+                return f"Failed to read MHT: {os.path.basename(file_path)}"
+        
+        # HEIC images - skip text extraction
+        elif file_ext == '.heic':
+            return f"Image file (no text): {os.path.basename(file_path)}"
+        
+        # Binary files
+        elif file_ext == '.bin':
+            return f"Binary file (no text): {os.path.basename(file_path)}"
         
         # Other file types - return placeholder
         else:
-            print(f"Unsupported file type for text extraction: {file_ext}")
             return f"Unsupported file type {file_ext}: {os.path.basename(file_path)}"
             
     except Exception as e:
-        print(f"Error extracting text from {file_path}: {str(e)}")
         return f"Error reading file: {os.path.basename(file_path)}"
 
 def extract_cv_features(file_path):
@@ -281,7 +321,6 @@ def extract_cv_features(file_path):
         try:
             # Check if file exists
             if not os.path.exists(file_path):
-                print(f"PDF file does not exist for feature extraction: {file_path}")
                 return {
                     "font_count": 1,
                     "text_density": 1,
@@ -291,7 +330,6 @@ def extract_cv_features(file_path):
             
             # Check if file is readable
             if not os.access(file_path, os.R_OK):
-                print(f"PDF file is not readable for feature extraction: {file_path}")
                 return {
                     "font_count": 1,
                     "text_density": 1,
@@ -302,7 +340,6 @@ def extract_cv_features(file_path):
             try:
                 doc = fitz.open(file_path)
             except fitz.FileDataError as fde:
-                print(f"PDF file is corrupted for feature extraction {file_path}: {str(fde)}")
                 return {
                     "font_count": 1,
                     "text_density": 1,
@@ -310,7 +347,6 @@ def extract_cv_features(file_path):
                     "pages": 1
                 }
             except Exception as open_error:
-                print(f"Cannot open PDF for feature extraction {file_path}: {str(open_error)}")
                 return {
                     "font_count": 1,
                     "text_density": 1,
@@ -320,7 +356,6 @@ def extract_cv_features(file_path):
             
             # Check if document has pages
             if len(doc) == 0:
-                print(f"PDF has no pages for feature extraction: {file_path}")
                 doc.close()
                 return {
                     "font_count": 1,
@@ -355,17 +390,16 @@ def extract_cv_features(file_path):
                                             font_counter[font] = 0
                                         font_counter[font] += 1
                     except Exception as block_error:
-                        print(f"Error extracting blocks from page {page_num} in {file_path}: {str(block_error)}")
+                        pass
                     
                     # Count bullet points (rough estimate)
                     try:
                         text = page.get_text()
                         bullet_points += text.count("•") + text.count("-") + text.count("*")
                     except Exception as text_error:
-                        print(f"Error extracting text from page {page_num} in {file_path}: {str(text_error)}")
+                        pass
                         
                 except Exception as page_error:
-                    print(f"Error processing page {page_num} in {file_path}: {str(page_error)}")
                     continue
                 
             # Calculate metrics
@@ -382,7 +416,6 @@ def extract_cv_features(file_path):
             }
             
         except Exception as e:
-            print(f"Error extracting features from {file_path}: {str(e)}")
             # Ensure document is closed even if there's an error
             if doc is not None:
                 try:
@@ -466,7 +499,6 @@ def load_cv_data_from_folder_structure(base_dir):
                         job_description_file = file_path
                         break
         except Exception as e:
-            print(f"Error reading job directory {job_path}: {str(e)}")
             continue
                 
         # Valid status folders
@@ -483,7 +515,6 @@ def load_cv_data_from_folder_structure(base_dir):
                 
                 # Check if it's a valid status folder
                 if status_dir.upper() not in valid_statuses:
-                    print(f"Skipping unknown status folder: {status_dir} in {job_dir}")
                     continue
                 
                 # Map status folder name to label
@@ -502,23 +533,19 @@ def load_cv_data_from_folder_structure(base_dir):
                         file_ext = os.path.splitext(cv_file)[1].lower()
                         supported_exts = ['.pdf', '.txt', '.docx', '.doc']
                         if file_ext not in supported_exts:
-                            print(f"Skipping unsupported file type: {cv_file}")
                             skipped_files += 1
                             continue
                         
                         # Verify file is readable
                         if not os.access(cv_path, os.R_OK):
-                            print(f"Skipping unreadable file: {cv_file}")
                             skipped_files += 1
                             continue
                         
                         # Add to data list with job description file
                         cv_data.append((cv_path, job_dir, status_dir, label, job_description_file))
                 except Exception as e:
-                    print(f"Error reading status folder {status_path}: {str(e)}")
                     continue
         except Exception as e:
-            print(f"Error processing job folder {job_path}: {str(e)}")
             continue
     
     print(f"\nProcessed {processed_jobs} job folders")
@@ -540,7 +567,7 @@ class CVJobDataset(Dataset):
     3. Format features (additional PDF features)
     4. Job information (one hot encoded job name)
     """
-    def __init__(self, cv_data, vit_processor, bert_tokenizer, max_length=256, extract_format_features=True):
+    def __init__(self, cv_data, vit_processor, bert_tokenizer, max_length=768, extract_format_features=True, use_chunk_processing=True):
         """
         Initialize the dataset
         
@@ -548,14 +575,16 @@ class CVJobDataset(Dataset):
             cv_data (list): List of (cv_path, job_name, status, label, job_description_file) tuples
             vit_processor: ViT image processor
             bert_tokenizer: BERT tokenizer
-            max_length (int): Max token length for BERT
+            max_length (int): Max token length for BERT (default 512)
             extract_format_features (bool): Whether to extract additional CV formatting features
+            use_chunk_processing (bool): Whether to use chunk processing for long texts
         """
         self.cv_data = cv_data
         self.vit_processor = vit_processor
         self.bert_tokenizer = bert_tokenizer
         self.max_length = max_length
         self.extract_format_features = extract_format_features
+        self.use_chunk_processing = use_chunk_processing
         
         # Cache for extracted features and text
         self.format_features_cache = {}
@@ -726,13 +755,24 @@ class MultimodalCVClassifier(nn.Module):
         self.visual_score = nn.Linear(256, 1)
         
         # Semantic analysis branch (CV-JD matching)
+        # Use larger hidden dim for better understanding
         self.semantic_branch = nn.Sequential(
-            nn.Linear(self.bert_dim, 512),
+            nn.Linear(self.bert_dim * 2, 768),  # CV + JD embeddings concatenated
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(768, 512),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
             nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
+        )
+        
+        # Cross-attention between CV and JD
+        self.cv_jd_attention = nn.MultiheadAttention(
+            embed_dim=self.bert_dim,
+            num_heads=8,
+            dropout=dropout_rate
         )
         
         # Semantic score prediction (how well CV matches JD)
@@ -815,8 +855,31 @@ class MultimodalCVClassifier(nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
         )
-        bert_features = bert_outputs.pooler_output  # [batch_size, bert_dim]
-        semantic_features = self.semantic_branch(bert_features)  # [batch_size, 256]
+        
+        # Get all hidden states for cross-attention
+        all_hidden_states = bert_outputs.last_hidden_state  # [batch_size, seq_len, bert_dim]
+        
+        # Separate CV and JD representations using token_type_ids
+        # token_type_ids = 0 for JD, 1 for CV
+        jd_mask = (token_type_ids == 0).float()
+        cv_mask = (token_type_ids == 1).float()
+        
+        # Get average embeddings for JD and CV
+        jd_embeddings = (all_hidden_states * jd_mask.unsqueeze(-1)).sum(dim=1) / jd_mask.sum(dim=1, keepdim=True).clamp(min=1)
+        cv_embeddings = (all_hidden_states * cv_mask.unsqueeze(-1)).sum(dim=1) / cv_mask.sum(dim=1, keepdim=True).clamp(min=1)
+        
+        # Apply cross-attention between CV and JD
+        cv_attended, _ = self.cv_jd_attention(
+            cv_embeddings.unsqueeze(0),  # Query
+            jd_embeddings.unsqueeze(0),  # Key
+            jd_embeddings.unsqueeze(0),  # Value
+        )
+        cv_attended = cv_attended.squeeze(0)
+        
+        # Concatenate original and attended features
+        combined_semantic = torch.cat([cv_embeddings, cv_attended], dim=1)  # [batch_size, bert_dim * 2]
+        
+        semantic_features = self.semantic_branch(combined_semantic)  # [batch_size, 256]
         
         # Calculate semantic score (higher = better match between CV and JD)
         semantic_score_val = self.semantic_score(semantic_features)  # [batch_size, 1]
@@ -834,6 +897,20 @@ class MultimodalCVClassifier(nn.Module):
         
         # Calculate attention weights for adaptive fusion
         attention_weights = self.attention(combined_features)  # [batch_size, 4]
+        
+        # Human brain-like processing: 
+        # If semantic score is high (good CV-JD match), give it more weight
+        # If visual score is low (poor formatting), reduce its importance
+        semantic_importance = torch.sigmoid(semantic_score_val).squeeze()
+        visual_penalty = torch.sigmoid(-visual_score_val).squeeze() * 0.5
+        
+        # Adjust weights based on scores (like human decision making)
+        adjusted_weights = attention_weights.clone()
+        adjusted_weights[:, 1] = adjusted_weights[:, 1] + semantic_importance * 0.3  # Boost semantic
+        adjusted_weights[:, 0] = adjusted_weights[:, 0] - visual_penalty * 0.2  # Reduce visual if poor
+        
+        # Re-normalize to sum to 1
+        attention_weights = F.softmax(adjusted_weights, dim=1)
         
         # Apply attention weights (reshape for broadcasting)
         visual_weight = attention_weights[:, 0].unsqueeze(1).expand_as(visual_features)
@@ -897,6 +974,7 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
         classification_loss_total = 0.0
         visual_loss_total = 0.0
         semantic_loss_total = 0.0
+        attention_loss_total = 0.0
         correct_predictions = 0
         total_predictions = 0
 
@@ -930,6 +1008,7 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
             logits = outputs['logits']
             visual_score = outputs['visual_score'].squeeze()
             semantic_score = outputs['semantic_score'].squeeze()
+            attention_weights = outputs['attention_weights']
             
             # Classification loss (main objective)
             classification_loss = criterion(logits, labels)
@@ -942,8 +1021,14 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
             # Semantic consistency loss (better matches = better classes)
             semantic_loss = F.mse_loss(torch.sigmoid(semantic_score), normalized_labels)
             
+            # Attention regularization to encourage semantic attention
+            # Target: visual=0.2, semantic=0.6, format=0.1, job=0.1
+            target_attention = torch.tensor([0.2, 0.6, 0.1, 0.1], device=device)
+            target_attention = target_attention.unsqueeze(0).expand_as(attention_weights)
+            attention_reg_loss = F.mse_loss(attention_weights, target_attention)
+            
             # Combined loss with weighting
-            loss = classification_loss + 0.2 * visual_loss + 0.2 * semantic_loss
+            loss = classification_loss + 0.2 * visual_loss + 0.3 * semantic_loss + 0.5 * attention_reg_loss
             
             # Backward pass and optimize
             loss.backward()
@@ -954,6 +1039,7 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
             classification_loss_total += classification_loss.item()
             visual_loss_total += visual_loss.item()
             semantic_loss_total += semantic_loss.item()
+            attention_loss_total += attention_reg_loss.item()
             
             _, preds = torch.max(logits, dim=1)
             correct_predictions += torch.sum(preds == labels).item()
@@ -971,6 +1057,7 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
         classification_loss_avg = classification_loss_total / len(train_dataloader)
         visual_loss_avg = visual_loss_total / len(train_dataloader)
         semantic_loss_avg = semantic_loss_total / len(train_dataloader)
+        attention_loss_avg = attention_loss_total / len(train_dataloader)
 
         # Validation phase
         val_accuracy, val_loss, val_component_losses = evaluate_model(
@@ -980,7 +1067,7 @@ def train_model(model, train_dataloader, val_dataloader, optimizer, criterion, e
         # Print epoch results
         print(f"Epoch {epoch+1}/{epochs} Results:")
         print(f"  Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
-        print(f"  Train Loss Components: Class={classification_loss_avg:.4f}, Visual={visual_loss_avg:.4f}, Semantic={semantic_loss_avg:.4f}")
+        print(f"  Train Loss Components: Class={classification_loss_avg:.4f}, Visual={visual_loss_avg:.4f}, Semantic={semantic_loss_avg:.4f}, Attention={attention_loss_avg:.4f}")
         print(f"  Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
         print(f"  Val Loss Components: Class={val_component_losses['class']:.4f}, Visual={val_component_losses['visual']:.4f}, Semantic={val_component_losses['semantic']:.4f}")
 
@@ -1253,12 +1340,17 @@ def main():
 
     # Create dataset
     print("\nCreating dataset with CV files...")
+    print("Using enhanced configuration:")
+    print("- Max token length: 512 (increased from 256)")
+    print("- Chunk processing: Enabled (for long documents)")
+    print("- Attention regularization: Targeting 60% semantic weight")
     dataset = CVJobDataset(
         cv_data=cv_data,
         vit_processor=vit_processor,
         bert_tokenizer=bert_tokenizer,
-        max_length=256,
-        extract_format_features=True
+        max_length=512,
+        extract_format_features=True,
+        use_chunk_processing=True
     )
 
     # Split into train and validation (with more data in training)
@@ -1308,9 +1400,26 @@ def main():
     print(f"- Fusion: Attention-weighted combination → 256 → {num_classes}")
     print(f"- Total Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
+    # Calculate class weights for imbalanced data
+    print("\nCalculating class weights for balanced training...")
+    class_counts = torch.zeros(4)  # 4 classes: ACCEPT, INTERVIEW, SHORTLIST, REJECT
+    for i in range(len(train_dataset)):
+        label = train_dataset[i]['label']
+        class_counts[label] += 1
+    
+    # Calculate inverse frequency weights
+    total_samples = class_counts.sum()
+    class_weights = total_samples / (4 * class_counts)
+    class_weights = class_weights / class_weights.mean()  # Normalize
+    
+    print("Class weights:")
+    status_names = ["ACCEPT", "INTERVIEW", "SHORTLIST", "REJECT"]
+    for i, (name, weight) in enumerate(zip(status_names, class_weights)):
+        print(f"  {name}: {weight:.2f} (count: {int(class_counts[i])})")
+    
     # Define optimizer and loss function (with weight decay for regularization)
     optimizer = optim.AdamW(model.parameters(), lr=2e-5, weight_decay=0.01)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
 
     # Determine number of epochs (fewer if we have very limited data)
     if dataset_size <= 2:

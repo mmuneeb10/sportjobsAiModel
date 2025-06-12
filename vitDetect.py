@@ -417,64 +417,58 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def process_text_in_chunks(bert_model, bert_tokenizer, job_description, cv_text, device, chunk_size=400):
-    """Process CV and JD text in chunks to capture all content"""
-    print("\nProcessing text in chunks for comprehensive semantic analysis...")
+def generate_status_reasoning(status, confidence, visual_score, semantic_score, attention_weights):
+    """Generate reasoning for why a particular status was predicted"""
+    reasons = []
     
-    # Split texts into chunks
-    def split_into_chunks(text, chunk_size):
-        words = text.split()
-        chunks = []
-        for i in range(0, len(words), chunk_size):
-            chunk = ' '.join(words[i:i + chunk_size])
-            chunks.append(chunk)
-        return chunks
+    # Convert scores to normalized values
+    visual_norm = sigmoid(visual_score)
+    semantic_norm = sigmoid(semantic_score)
     
-    # Create JD summary (first 200 words) to pair with each CV chunk
-    jd_words = job_description.split()
-    jd_summary = ' '.join(jd_words[:200])
-    
-    # Split CV into chunks
-    cv_chunks = split_into_chunks(cv_text, chunk_size)
-    print(f"  Processing {len(cv_chunks)} CV chunks...")
-    
-    semantic_scores = []
-    
-    # Process each CV chunk with JD summary
-    for i, cv_chunk in enumerate(cv_chunks):
-        encoding = bert_tokenizer(
-            jd_summary,
-            cv_chunk,
-            add_special_tokens=True,
-            max_length=512,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-            return_overflowing_tokens=False,
-        )
-        
-        input_ids = encoding["input_ids"].to(device)
-        attention_mask = encoding["attention_mask"].to(device)
-        token_type_ids = encoding["token_type_ids"].to(device)
-        
-        with torch.no_grad():
-            bert_outputs = bert_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                token_type_ids=token_type_ids,
-            )
+    # Status-specific reasoning
+    if status == "ACCEPT":
+        reasons.append(f"Strong candidate with {confidence:.0%} confidence")
+        if semantic_norm >= 0.7:
+            reasons.append("Excellent match between CV content and job requirements")
+        if visual_norm >= 0.7:
+            reasons.append("Professional and well-structured CV presentation")
+        if attention_weights['semantic'] > 0.5:
+            reasons.append("Content quality was the primary decision factor")
             
-            # Get pooled output for this chunk
-            chunk_features = bert_outputs.pooler_output
-            semantic_scores.append(chunk_features)
+    elif status == "INTERVIEW":
+        reasons.append(f"Promising candidate worth interviewing ({confidence:.0%} confidence)")
+        if semantic_norm >= 0.5:
+            reasons.append("Good alignment with job requirements, needs further assessment")
+        if visual_norm >= 0.6:
+            reasons.append("Well-presented CV shows attention to detail")
+        if semantic_norm < 0.7:
+            reasons.append("Some skill gaps that need clarification in interview")
+            
+    elif status == "SHORTLIST":
+        reasons.append(f"Potential candidate for consideration ({confidence:.0%} confidence)")
+        if semantic_norm >= 0.4:
+            reasons.append("Partial match with job requirements")
+        if visual_norm < 0.6:
+            reasons.append("CV presentation could be improved")
+        reasons.append("May be suitable if stronger candidates are unavailable")
+        
+    elif status == "REJECT":
+        reasons.append(f"Not suitable for this position ({confidence:.0%} confidence)")
+        if semantic_norm < 0.4:
+            reasons.append("Significant mismatch between CV and job requirements")
+        if visual_norm < 0.4:
+            reasons.append("Poor CV presentation indicates lack of professionalism")
+        if attention_weights['visual'] > attention_weights['semantic']:
+            reasons.append("Even formatting issues contributed to rejection")
     
-    # Average all chunk features
-    if semantic_scores:
-        avg_semantic_features = torch.stack(semantic_scores).mean(dim=0, keepdim=True)
-        return avg_semantic_features
-    else:
-        # Fallback to empty tensor if no chunks
-        return torch.zeros(1, bert_model.config.hidden_size).to(device)
+    # Add score-based insights
+    if abs(visual_norm - semantic_norm) > 0.3:
+        if visual_norm > semantic_norm:
+            reasons.append("Note: CV looks good but content doesn't match job well")
+        else:
+            reasons.append("Note: Good content but poor presentation hurts the application")
+    
+    return reasons
 
 def find_files_in_detect_folder():
     """Find job description and CV files in the detect folder"""
@@ -521,8 +515,8 @@ def print_banner(text):
     print(f"  {text}")
     print("="*width + "\n")
 
-def log_result(cv_name, status, confidence, visual_score, semantic_score, attention_weights):
-    """Log the detection result prominently"""
+def log_result(cv_name, status, confidence, visual_score, semantic_score, attention_weights, reasoning):
+    """Log the detection result prominently with reasoning"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # Create prominent result display
@@ -550,6 +544,26 @@ def log_result(cv_name, status, confidence, visual_score, semantic_score, attent
     print("*" + " " * 98 + "*")
     print("*" + "-" * 98 + "*")
     print("*" + " " * 98 + "*")
+    print("*" + "  REASONING FOR DECISION:".center(96) + "*")
+    print("*" + " " * 98 + "*")
+    for reason in reasoning:
+        # Wrap long reasons
+        if len(reason) <= 94:
+            print("*" + f"  • {reason}".center(96) + "*")
+        else:
+            words = reason.split()
+            line = "• "
+            for word in words:
+                if len(line + word) <= 94:
+                    line += word + " "
+                else:
+                    print("*" + f"  {line.strip()}".center(96) + "*")
+                    line = "  " + word + " "
+            if line.strip():
+                print("*" + f"  {line.strip()}".center(96) + "*")
+    print("*" + " " * 98 + "*")
+    print("*" + "-" * 98 + "*")
+    print("*" + " " * 98 + "*")
     print("*" + f"  Model Attention Focus:".center(96) + "*")
     print("*" + f"  Visual: {attention_weights['visual']:.2f} | Semantic: {attention_weights['semantic']:.2f} | Format: {attention_weights['format']:.2f} | Job: {attention_weights['job']:.2f}".center(96) + "*")
     print("*" + " " * 98 + "*")
@@ -567,6 +581,9 @@ def log_result(cv_name, status, confidence, visual_score, semantic_score, attent
         f.write(f"Confidence: {confidence:.2%}\n")
         f.write(f"Visual Score: {visual_score:.2%}\n")
         f.write(f"Semantic Score: {semantic_score:.2%}\n")
+        f.write(f"Reasoning:\n")
+        for reason in reasoning:
+            f.write(f"  - {reason}\n")
         f.write(f"Attention Weights: Visual={attention_weights['visual']:.2f}, Semantic={attention_weights['semantic']:.2f}, Format={attention_weights['format']:.2f}, Job={attention_weights['job']:.2f}\n")
         f.write(f"{'='*60}\n")
     
@@ -635,26 +652,13 @@ def main():
         min(format_features_dict["pages"], 5) / 5.0
     ], dtype=torch.float32).unsqueeze(0).to(device)
     
-    # Process text with BERT tokenizer - now using chunk-based approach
+    # Process text with BERT tokenizer - matching train.py approach
     print("Processing text with BERT...")
     
-    # Get comprehensive semantic features using chunk processing
-    chunk_semantic_features = process_text_in_chunks(
-        model.bert, 
-        bert_tokenizer, 
-        job_description, 
-        cv_text, 
-        device
-    )
-    
-    # Also create a standard encoding for the model's expected input format
-    # This uses truncated versions but the semantic score will come from chunk processing
-    jd_truncated = job_description[:500] if len(job_description) > 500 else job_description
-    cv_truncated = cv_text[:1500] if len(cv_text) > 1500 else cv_text
-    
+    # Use the same tokenization approach as train.py (no chunking)
     encoding = bert_tokenizer(
-        jd_truncated,
-        cv_truncated,
+        job_description,  # First text (Job description)
+        cv_text,          # Second text (CV content)
         add_special_tokens=True,
         max_length=512,
         padding="max_length",
@@ -677,56 +681,24 @@ def main():
     job_one_hot = torch.zeros(1, 10, dtype=torch.float32).to(device)
     job_one_hot[0, 0] = 1.0
     
-    # Make prediction with modified semantic processing
+    # Make prediction - matching train.py approach
     print("\nMaking prediction...")
     with torch.no_grad():
-        # First get the visual features
-        vit_outputs = model.vit(pixel_values=pixel_values)
-        vit_features = vit_outputs.pooler_output
-        visual_features = model.visual_branch(vit_features)
-        visual_score_val = model.visual_score(visual_features)
-        
-        # Use our chunk-based semantic features
-        semantic_features = model.semantic_branch(chunk_semantic_features)
-        semantic_score_val = model.semantic_score(semantic_features)
-        
-        # Ensure semantic_features has the right shape [batch_size, feature_dim]
-        if semantic_features.dim() == 3:
-            semantic_features = semantic_features.squeeze(1)
-        
-        # Get format and job features
-        format_features_processed = model.format_branch(format_features)
-        job_features = model.job_branch(job_one_hot)
-        
-        # Combine all features
-        combined_features = torch.cat(
-            (visual_features, semantic_features, format_features_processed, job_features), dim=1
+        # Forward pass through the model (same as training)
+        outputs = model(
+            pixel_values,
+            input_ids,
+            attention_mask,
+            token_type_ids,
+            format_features,
+            job_one_hot
         )
         
-        # Get attention weights
-        attention_weights = model.attention(combined_features)
-        
-        # Apply attention weights
-        visual_weight = attention_weights[:, 0].unsqueeze(1).expand_as(visual_features)
-        semantic_weight = attention_weights[:, 1].unsqueeze(1).expand_as(semantic_features)
-        format_weight = attention_weights[:, 2].unsqueeze(1).expand_as(format_features_processed)
-        job_weight = attention_weights[:, 3].unsqueeze(1).expand_as(job_features)
-        
-        weighted_visual = visual_features * visual_weight
-        weighted_semantic = semantic_features * semantic_weight
-        weighted_format = format_features_processed * format_weight
-        weighted_job = job_features * job_weight
-        
-        weighted_features = torch.cat(
-            (weighted_visual, weighted_semantic, weighted_format, weighted_job), dim=1
-        )
-        
-        # Get final prediction
-        logits = model.classifier(weighted_features)
-        
-        visual_score = visual_score_val.item()
-        semantic_score = semantic_score_val.item()
-        attention_weights_np = attention_weights[0].cpu().numpy()
+        # Get outputs
+        logits = outputs['logits']
+        visual_score = outputs['visual_score'].item()
+        semantic_score = outputs['semantic_score'].item()
+        attention_weights_np = outputs['attention_weights'][0].cpu().numpy()
         
         # Get probabilities and predicted class
         probabilities = F.softmax(logits, dim=1)[0]
@@ -744,14 +716,24 @@ def main():
         "job": attention_weights_np[3]
     }
     
-    # Log the result prominently
+    # Generate reasoning for the decision
+    reasoning = generate_status_reasoning(
+        status=status,
+        confidence=confidence,
+        visual_score=visual_score,
+        semantic_score=semantic_score,
+        attention_weights=attention_dict
+    )
+    
+    # Log the result prominently with reasoning
     log_result(
         cv_name=os.path.basename(cv_file),
         status=status,
         confidence=confidence,
         visual_score=sigmoid(visual_score),
         semantic_score=sigmoid(semantic_score),
-        attention_weights=attention_dict
+        attention_weights=attention_dict,
+        reasoning=reasoning
     )
     
     # Show all probabilities

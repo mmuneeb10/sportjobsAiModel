@@ -50,7 +50,7 @@ class CVExtractor:
         self.connection = None
         
         # Define the base directory where CVs will be stored
-        self.base_cv_folder = "CVS"
+        self.base_cv_folder = "updatedCvsV2"
         
         # Create the base CV folder if it doesn't exist
         self._ensure_directory_exists(self.base_cv_folder)
@@ -193,15 +193,15 @@ class CVExtractor:
             logger.error(f"Error fetching candidate submissions: {str(e)}")
             return []
     
-    def fetch_candidate_cv_url(self, bullhorn_candidate_id: int) -> Optional[str]:
+    def fetch_candidate_cv_url(self, bullhorn_candidate_id: int) -> Optional[Dict]:
         """
-        Fetch the CV URL for a candidate from BullhornFile table
+        Fetch the CV URL and file info for a candidate from BullhornFile table
         
         Args:
             bullhorn_candidate_id (int): The bullhornCandidateId from submission
             
         Returns:
-            str: CV URL or None if not found
+            dict: File info with s3Url, contentType, fileName or None if not found
         """
         try:
             # Create a cursor to execute database queries with results as dictionaries
@@ -228,10 +228,10 @@ class CVExtractor:
                 # Fetch the result
                 result = cursor.fetchone()
                 
-                # Return CV URL if found
+                # Return file info if found
                 if result:
                     logger.info(f"Found CV file for candidate {bullhorn_candidate_id}: {result['fileName']}")
-                    return result['s3Url']
+                    return dict(result)
                 else:
                     logger.warning(f"No CV file found for candidate {bullhorn_candidate_id}")
                     return None
@@ -437,23 +437,52 @@ class CVExtractor:
                     # Log processing of this candidate
                     logger.info(f"Processing candidate: {candidate_name} (ID: {bullhorn_candidate_id}, Status: {status})")
                     
-                    # Step 5: Fetch CV URL from BullhornFile table using bullhornCandidateId
-                    cv_url = self.fetch_candidate_cv_url(bullhorn_candidate_id)
+                    # Step 5: Fetch CV file info from BullhornFile table using bullhornCandidateId
+                    cv_file_info = self.fetch_candidate_cv_url(bullhorn_candidate_id)
                     
-                    # Skip if CV URL is empty or None
-                    if not cv_url:
-                        logger.warning(f"No CV URL found for candidate {bullhorn_candidate_id} in BullhornFile table")
+                    # Skip if CV file info is empty or None
+                    if not cv_file_info:
+                        logger.warning(f"No CV file found for candidate {bullhorn_candidate_id} in BullhornFile table")
                         failure_count += 1
                         continue
+                    
+                    # Extract URL and content type
+                    cv_url = cv_file_info['s3Url']
+                    content_type = cv_file_info['contentType']
                     
                     # Step 6: Create status-specific folder structure
                     _, status_folder = self.create_folder_structure(job_description, status)
                     
-                    # Generate filename for the CV
+                    # Generate filename for the CV based on content type
                     # Clean candidate name for filesystem
                     clean_name = ''.join(c for c in candidate_name if c.isalnum() or c in (' ', '-', '_'))
-                    # Create filename with candidate ID and name
-                    cv_filename = f"{bullhorn_candidate_id}_{clean_name}.pdf"
+                    
+                    # Get file extension based on content type
+                    if content_type == 'application/pdf':
+                        file_extension = '.pdf'
+                    elif content_type == 'application/msword':
+                        file_extension = '.doc'
+                    elif content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                        file_extension = '.docx'
+                    elif content_type == 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+                        file_extension = '.pptx'
+                    elif content_type == 'application/vnd.oasis.opendocument.text':
+                        file_extension = '.odt'
+                    elif content_type == 'text/plain':
+                        file_extension = '.txt'
+                    elif content_type == 'image/heic':
+                        file_extension = '.heic'
+                    elif content_type == 'application/octet-stream':
+                        file_extension = '.bin'
+                    elif content_type == 'multipart/related':
+                        file_extension = '.mht'
+                    elif content_type == 'message/rfc822':
+                        file_extension = '.eml'
+                    else:
+                        file_extension = '.pdf'  # fallback
+                    
+                    # Create filename with candidate ID and name with proper extension
+                    cv_filename = f"{bullhorn_candidate_id}_{clean_name}{file_extension}"
                     # Full path for the CV file
                     cv_path = os.path.join(status_folder, cv_filename)
                     
@@ -496,14 +525,9 @@ def main():
     }
     
     # ================== JOB ID CONFIGURATION ==================
-    # Option 1: Single job processing
-    # Replace 123 with the actual bullhornJobId you want to process
-    # This need to be the bullhornId for the bullHornJob not the id
-    job_description_id = 250  # Example: 456789
-    
-    # Option 2: Multiple jobs processing (uncomment to use)
-    # job_ids = [123, 124, 125]  # List of bullhornJobIds to process
-    
+    # Multiple jobs processing
+    # job_ids = [250, 251, 252, 253, 254, 255, 256, 257, 258, 259]  # List of bullhornJobIds to process
+    job_ids =[257, 261, 258, 259, 260, 256, 253, 255, 254, 252, 243, 251, 250, 249, 248, 247, 246, 245, 244, 242, 241, 240, 239, 238, 237]
     # Option 3: Command line argument (uncomment to use)
     # import sys
     # if len(sys.argv) > 1:
@@ -521,14 +545,10 @@ def main():
         logger.info("Connecting to database...")
         extractor.connect_to_database()
         
-        # Process CVs for the specified job
-        logger.info(f"Processing CVs for Bullhorn Job ID: {job_description_id}")
-        extractor.process_job_cvs(job_description_id)
-        
-        # Option 2: Process multiple jobs (uncomment if using job_ids list)
-        # for job_id in job_ids:
-        #     logger.info(f"Processing CVs for Bullhorn Job ID: {job_id}")
-        #     extractor.process_job_cvs(job_id)
+        # Process multiple jobs
+        for job_id in job_ids:
+            logger.info(f"Processing CVs for Bullhorn Job ID: {job_id}")
+            extractor.process_job_cvs(job_id)
         
         logger.info("CV extraction process completed successfully!")
         

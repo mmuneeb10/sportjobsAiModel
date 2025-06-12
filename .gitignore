@@ -7,3 +7,13 @@ CVS/
 venv/
 *.log
 *.pt
+phi2_model/
+mistral_model/
+updatedCvs/
+llama_model/
+detect/
+cv_jd_finetuned/
+*.zip
+updatedCvsV2/
+detect/
+
