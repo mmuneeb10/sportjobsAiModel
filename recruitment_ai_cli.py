@@ -160,6 +160,12 @@ class RecruitmentAICLI:
     def export_results(self, results: list, output_file: str):
         """Export results to file"""
         output_path = Path(output_file)
+        
+        # Handle missing extension
+        if not output_path.suffix:
+            print("No file extension provided. Defaulting to .csv")
+            output_path = output_path.with_suffix('.csv')
+        
         if output_path.suffix == '.json':
             with open(output_path, 'w') as f:
                 json.dump(results, f, indent=2)
@@ -180,7 +186,7 @@ class RecruitmentAICLI:
             df = pd.DataFrame(flat_results)
             df.to_csv(output_path, index=False)
         else:
-            raise ValueError(f"Unsupported output format: {output_path.suffix}")
+            raise ValueError(f"Unsupported output format: {output_path.suffix}. Use .json or .csv")
         
         print(f"\nResults exported to: {output_path}")
     
