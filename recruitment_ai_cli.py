@@ -160,7 +160,6 @@ class RecruitmentAICLI:
     def export_results(self, results: list, output_file: str):
         """Export results to file"""
         output_path = Path(output_file)
-        
         if output_path.suffix == '.json':
             with open(output_path, 'w') as f:
                 json.dump(results, f, indent=2)
