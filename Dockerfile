@@ -32,5 +32,5 @@ ENV FLASK_APP=api_server.py
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Default command runs the API server
-CMD ["python", "api_server.py"]
+# Default command runs the API server with Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "api_server:app"]
