@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  recruitment-ai:
+    build: .
+    container_name: recruitment-ai-api
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount model directory to persist trained models
+      - ./recruitment_model:/app/recruitment_model
+      # Mount data directory for training data
+      - ./data:/app/data
+      # Mount jobs directory for job descriptions
+      - ./jobs:/app/jobs
+    environment:
+      - PYTHONPATH=/app
+      - FLASK_APP=api_server.py
+      - FLASK_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
