@@ -860,3 +860,61 @@ Top 10 Most Important Features:
 2025-06-12 05:16:26,570 - INFO - Training completed successfully!
 2025-06-12 05:16:26,570 - INFO - Overall accuracy: 69.31%
 2025-06-12 05:16:26,570 - INFO - ==================================================
+2025-06-23 18:08:57,481 - INFO - ==================================================
+2025-06-23 18:08:57,482 - INFO - Starting Recruitment AI Training Pipeline
+2025-06-23 18:08:57,482 - INFO - ==================================================
+2025-06-23 18:08:57,482 - INFO - Loading data from jobs
+2025-06-23 18:10:06,315 - INFO - ==================================================
+2025-06-23 18:10:06,315 - INFO - Starting Recruitment AI Training Pipeline
+2025-06-23 18:10:06,315 - INFO - ==================================================
+2025-06-23 18:10:06,315 - INFO - Loading data from jobs
+2025-06-23 18:11:29,469 - INFO - Loaded 941 CV samples
+2025-06-23 18:11:29,473 - INFO - Stage distribution:
+stage
+REJECT       643
+SHORTLIST    209
+INTERVIEW     70
+ACCEPT        19
+Name: count, dtype: int64
+2025-06-23 18:11:29,473 - INFO - Preparing features...
+2025-06-23 18:11:31,591 - INFO - Feature shape: (941, 15)
+2025-06-23 18:11:31,591 - INFO - Label distribution: [643 209  70  19]
+2025-06-23 18:11:31,591 - INFO - Starting model training...
+2025-06-23 18:11:31,591 - INFO - Minimum samples per class: 19
+2025-06-23 18:11:31,594 - INFO - Training set: (752, 15), Test set: (189, 15)
+2025-06-23 18:11:31,594 - INFO - Training ensemble models...
+2025-06-23 18:11:36,742 - INFO - Evaluating models...
+2025-06-23 18:11:36,759 - INFO - Classes found in data: [0 1 2 3]
+2025-06-23 18:11:36,759 - INFO - Using stage names: ['REJECT', 'SHORTLIST', 'INTERVIEW', 'ACCEPT']
+2025-06-23 18:11:36,764 - INFO - 
+Classification Report:
+2025-06-23 18:11:36,766 - INFO -               precision    recall  f1-score   support
+
+      REJECT       0.72      0.98      0.83       129
+   SHORTLIST       0.36      0.10      0.15        42
+   INTERVIEW       0.00      0.00      0.00        14
+      ACCEPT       0.50      0.25      0.33         4
+
+    accuracy                           0.69       189
+   macro avg       0.39      0.33      0.33       189
+weighted avg       0.58      0.69      0.60       189
+
+2025-06-23 18:11:38,700 - INFO - Analyzing feature importance...
+2025-06-23 18:11:38,716 - INFO - 
+Top 10 Most Important Features:
+2025-06-23 18:11:38,716 - INFO - 1. Text Similarity: 0.2530
+2025-06-23 18:11:38,716 - INFO - 2. Total Skills: 0.1393
+2025-06-23 18:11:38,716 - INFO - 3. Industry Keywords: 0.1239
+2025-06-23 18:11:38,716 - INFO - 4. Experience Years: 0.1174
+2025-06-23 18:11:38,716 - INFO - 5. Experience Ratio: 0.1124
+2025-06-23 18:11:38,716 - INFO - 6. Certifications: 0.0795
+2025-06-23 18:11:38,716 - INFO - 7. Achievements: 0.0656
+2025-06-23 18:11:38,716 - INFO - 8. Communication Score: 0.0618
+2025-06-23 18:11:38,716 - INFO - 9. Location Match: 0.0131
+2025-06-23 18:11:38,716 - INFO - 10. Meets Experience: 0.0116
+2025-06-23 18:11:38,764 - INFO - Saving results...
+2025-06-23 18:11:38,826 - INFO - Results saved successfully!
+2025-06-23 18:11:38,826 - INFO - ==================================================
+2025-06-23 18:11:38,826 - INFO - Training completed successfully!
+2025-06-23 18:11:38,826 - INFO - Overall accuracy: 69.31%
+2025-06-23 18:11:38,826 - INFO - ==================================================

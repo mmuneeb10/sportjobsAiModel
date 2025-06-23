@@ -13,6 +13,7 @@ import logging
 from urllib.parse import urlparse
 
 from recruitment_ai_cli import RecruitmentAICLI
+from cv_processor import CVProcessor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,9 @@ app = Flask(__name__)
 
 # Initialize the recruitment AI CLI
 recruitment_ai = RecruitmentAICLI()
+
+# Initialize CV processor
+cv_processor = CVProcessor()
 
 def download_file_from_url(url: str, suffix: str = None) -> str:
     """
@@ -138,6 +142,96 @@ def evaluate_cv():
         
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@app.route('/extract-name', methods=['POST'])
+def extract_name_from_cv():
+    """
+    Extract candidate name from CV file
+    
+    Expected JSON payload:
+    {
+        "cv_url": "https://example.com/cv.pdf"
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "name": "John Doe",
+        "confidence": "high"
+    }
+    """
+    try:
+        # Validate request
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+        
+        data = request.get_json()
+        
+        # Check required field
+        if 'cv_url' not in data:
+            return jsonify({
+                "error": "Missing required field: cv_url"
+            }), 400
+        
+        cv_url = data['cv_url']
+        
+        logger.info(f"Processing name extraction request for CV: {cv_url}")
+        
+        # Download file to temporary location
+        cv_temp_path = None
+        
+        try:
+            # Download CV file
+            cv_temp_path = download_file_from_url(cv_url)
+            
+            # Process the CV to extract data
+            cv_data = cv_processor.process_cv(cv_temp_path)
+            
+            # Get raw text
+            raw_text = cv_data.get('raw_text', '')
+            
+            if not raw_text:
+                return jsonify({
+                    "success": False,
+                    "error": "Could not extract text from CV"
+                }), 400
+            
+            # Extract name using the dedicated method
+            extracted_name = cv_processor.extract_name(raw_text)
+            
+            # Determine confidence level based on extraction
+            confidence = "high" if extracted_name else "low"
+            
+            # If no name found with high confidence, try contact info
+            if not extracted_name:
+                contact_info = cv_data.get('contact_info', {})
+                # Try to find name in contact info (if implemented there)
+                if 'name' in contact_info:
+                    extracted_name = contact_info['name']
+                    confidence = "medium"
+            
+            # Log the result
+            logger.info(f"Name extraction result: '{extracted_name}' with confidence: {confidence}")
+            
+            # Return the result
+            return jsonify({
+                "success": True,
+                "name": extracted_name,
+                "confidence": confidence
+            })
+            
+        finally:
+            # Clean up temporary file
+            if cv_temp_path:
+                cleanup_temp_file(cv_temp_path)
+                
+    except requests.RequestException as e:
+        logger.error(f"Error downloading file: {e}")
+        return jsonify({"error": f"Failed to download file: {str(e)}"}), 400
+        
+    except Exception as e:
+        logger.error(f"Unexpected error during name extraction: {e}")
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 @app.errorhandler(404)

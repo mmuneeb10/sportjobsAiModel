@@ -357,6 +357,217 @@ class CVProcessor:
         # If all methods fail, return empty string
         return ""
     
+    def extract_name(self, text: str) -> str:
+        """
+        Extract candidate name from CV text using multiple strategies
+        Handles various CV formats where name can appear anywhere
+        """
+        if not text or not text.strip():
+            return ""
+        
+        # Clean text for processing
+        text = text.strip()
+        lines = text.split('\n')
+        
+        # Strategy 1: Look for explicit name patterns
+        name_patterns = [
+            # Name: John Doe or Name - John Doe
+            r'(?:Name|NAME|Full Name|FULL NAME|Candidate Name)\s*[:|-]\s*([A-Za-z]+(?:\s+[A-Za-z]+)+)',
+            # Personal Information section
+            r'(?:Personal Information|PERSONAL INFORMATION|Personal Details)\s*\n+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+            # Contact Information followed by name
+            r'(?:Contact Information|CONTACT INFORMATION|Contact Details)\s*\n+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+        ]
+        
+        for pattern in name_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+            if match:
+                name = match.group(1).strip()
+                # Validate name
+                if self._is_valid_name(name):
+                    return name
+        
+        # Strategy 2: Look at the first few non-empty lines
+        # Most CVs start with the candidate's name
+        for i, line in enumerate(lines[:10]):
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Skip common headers and non-name content
+            skip_patterns = [
+                r'curriculum\s*vitae', r'resume', r'cv\b', r'profile',
+                r'@', r'http', r'www\.', r'\.com', r'page\s*\d+',
+                r'confidential', r'references', r'objective', r'summary'
+            ]
+            
+            if any(re.search(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+                continue
+            
+            # Skip lines with too many numbers (likely phone/address)
+            if len(re.findall(r'\d', line)) > 5:
+                continue
+            
+            # Check if line looks like a name
+            if self._looks_like_name(line):
+                return line
+        
+        # Strategy 3: Find name near email address
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_match = re.search(email_pattern, text)
+        
+        if email_match:
+            email = email_match.group()
+            email_pos = text.find(email)
+            
+            # Extract context around email (300 chars before and after)
+            context_start = max(0, email_pos - 300)
+            context_end = min(len(text), email_pos + 300)
+            context = text[context_start:context_end]
+            context_lines = context.split('\n')
+            
+            # Look for name-like patterns near email
+            for line in context_lines:
+                line = line.strip()
+                if line and email not in line and self._looks_like_name(line):
+                    return line
+            
+            # Try to extract name from email prefix
+            email_prefix = email.split('@')[0]
+            # Remove numbers and common separators
+            name_from_email = re.sub(r'[\d._-]', ' ', email_prefix).strip()
+            
+            # Search for this name pattern in the document
+            if name_from_email:
+                words = name_from_email.split()
+                if words:
+                    # Look for these words appearing together in proper case
+                    for i in range(len(lines)):
+                        line = lines[i].strip()
+                        if all(word.lower() in line.lower() for word in words):
+                            # Check if this line is a properly formatted name
+                            if self._looks_like_name(line):
+                                return line
+        
+        # Strategy 4: Look for the largest text or bold text in first page
+        # This requires looking for patterns that might indicate emphasis
+        emphasized_patterns = [
+            r'^([A-Z\s]+)$',  # All caps name
+            r'^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)+)\s*$',  # Title case full name
+        ]
+        
+        for i, line in enumerate(lines[:20]):
+            line = line.strip()
+            if not line or len(line) > 50:  # Skip long lines
+                continue
+                
+            for pattern in emphasized_patterns:
+                match = re.match(pattern, line)
+                if match:
+                    potential_name = match.group(1).strip()
+                    if self._is_valid_name(potential_name):
+                        return potential_name.title()  # Convert to proper case
+        
+        # Strategy 5: Machine learning based approach using common name indicators
+        # Look for lines that have name-like characteristics
+        name_indicators = {
+            'length': lambda x: 10 <= len(x) <= 40,
+            'words': lambda x: 2 <= len(x.split()) <= 4,
+            'capitals': lambda x: sum(1 for c in x if c.isupper()) >= 2,
+            'no_special': lambda x: not re.search(r'[!@#$%^&*()_+=\[\]{};:"\\|,.<>?/]', x),
+            'has_letters': lambda x: sum(1 for c in x if c.isalpha()) >= 5,
+        }
+        
+        candidates = []
+        for i, line in enumerate(lines[:30]):
+            line = line.strip()
+            if not line:
+                continue
+                
+            score = sum(1 for check in name_indicators.values() if check(line))
+            if score >= 4:
+                candidates.append((score, i, line))
+        
+        # Sort by score and position (prefer higher score and earlier position)
+        candidates.sort(key=lambda x: (-x[0], x[1]))
+        
+        for score, pos, candidate in candidates[:5]:
+            if self._is_valid_name(candidate):
+                return candidate
+        
+        return ""  # Return empty string if no name found
+    
+    def _looks_like_name(self, text: str) -> bool:
+        """Check if text looks like a person's name"""
+        if not text:
+            return False
+            
+        # Remove extra spaces
+        text = ' '.join(text.split())
+        
+        # Check length
+        if len(text) < 3 or len(text) > 50:
+            return False
+        
+        # Check word count (names typically have 2-4 words)
+        words = text.split()
+        if len(words) < 1 or len(words) > 5:
+            return False
+        
+        # Check if mostly alphabetic
+        alpha_chars = sum(1 for c in text if c.isalpha() or c.isspace())
+        if alpha_chars < len(text) * 0.8:
+            return False
+        
+        # Check for common name patterns
+        # At least first letter of each word should be capital or all could be capital
+        is_title_case = all(word[0].isupper() or len(word) <= 2 for word in words if word)
+        is_all_caps = text.isupper()
+        
+        if not (is_title_case or is_all_caps):
+            return False
+        
+        # Exclude common false positives
+        false_positives = [
+            'curriculum vitae', 'resume', 'personal information', 'contact details',
+            'professional summary', 'work experience', 'education', 'skills',
+            'references', 'page', 'confidential', 'private', 'address', 'email',
+            'phone', 'mobile', 'linkedin', 'objective', 'profile', 'summary'
+        ]
+        
+        text_lower = text.lower()
+        if any(fp in text_lower for fp in false_positives):
+            return False
+        
+        return True
+    
+    def _is_valid_name(self, name: str) -> bool:
+        """Validate if extracted text is a valid name"""
+        if not name:
+            return False
+            
+        # Clean the name
+        name = ' '.join(name.split())
+        
+        # Check basic criteria
+        if len(name) < 3 or len(name) > 50:
+            return False
+            
+        words = name.split()
+        if len(words) < 2:  # Require at least first and last name
+            return False
+            
+        # Check if each word is valid
+        for word in words:
+            # Allow short words like "Jr", "Sr", "de", "van"
+            if len(word) <= 2:
+                continue
+            # Check if word contains mostly letters
+            if not word.replace('-', '').replace("'", '').isalpha():
+                return False
+        
+        return True
+    
     def _extract_contact_info(self, text: str) -> Dict:
         """Extract contact information"""
         contact = {}
