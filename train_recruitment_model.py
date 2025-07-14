@@ -49,6 +49,11 @@ class RecruitmentModelTrainer:
         """Load all CV data from jobs directory"""
         logger.info(f"Loading data from {self.jobs_directory}")
         
+        # Count total jobs
+        job_folders = [d for d in self.jobs_directory.iterdir() 
+                      if d.is_dir() and (d / 'job_description.txt').exists()]
+        logger.info(f"Found {len(job_folders)} job folders to process")
+        
         # Process all jobs
         df = self.batch_processor.process_all_jobs(str(self.jobs_directory))
         
@@ -56,7 +61,7 @@ class RecruitmentModelTrainer:
             logger.warning("No CV data found. Creating sample data for demonstration...")
             df = self._create_sample_data()
         
-        logger.info(f"Loaded {len(df)} CV samples")
+        logger.info(f"Loaded {len(df)} CV samples from {len(job_folders)} jobs")
         logger.info(f"Stage distribution:\n{df['stage'].value_counts()}")
         
         self.training_data = df

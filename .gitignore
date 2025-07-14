@@ -9,3 +9,4 @@ data/
 .claude
 __pycache__
 venv
+cv_extractor.py
