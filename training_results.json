@@ -1,16 +1,16 @@
 {
-  "accuracy": 0.7615499254843517,
+  "accuracy": 0.7630402384500745,
   "classification_report": {
     "REJECT": {
-      "precision": 0.7723387723387724,
-      "recall": 0.9822134387351779,
-      "f1-score": 0.864723792953458,
+      "precision": 0.7733644859813084,
+      "recall": 0.9812252964426877,
+      "f1-score": 0.8649825783972126,
       "support": 1012.0
     },
     "SHORTLIST": {
-      "precision": 0.52,
-      "recall": 0.10526315789473684,
-      "f1-score": 0.1750841750841751,
+      "precision": 0.5471698113207547,
+      "recall": 0.11740890688259109,
+      "f1-score": 0.19333333333333333,
       "support": 247.0
     },
     "INTERVIEW": {
@@ -25,36 +25,36 @@
       "f1-score": 0.1,
       "support": 19.0
     },
-    "accuracy": 0.7615499254843517,
+    "accuracy": 0.7630402384500745,
     "macro avg": {
-      "precision": 0.6355846930846931,
-      "recall": 0.28893329389432076,
-      "f1-score": 0.29230493318587886,
+      "precision": 0.6426335743255158,
+      "recall": 0.2917226955681618,
+      "f1-score": 0.29693191910910705,
       "support": 1342.0
     },
     "weighted avg": {
-      "precision": 0.7042077776504007,
-      "recall": 0.7615499254843517,
-      "f1-score": 0.6871301212040739,
+      "precision": 0.7099819696045532,
+      "recall": 0.7630402384500745,
+      "f1-score": 0.6906840950912735,
       "support": 1342.0
     }
   },
   "confusion_matrix": [
     [
-      994,
-      17,
+      993,
+      18,
       1,
       0
     ],
     [
-      219,
-      26,
+      216,
+      29,
       2,
       0
     ],
     [
-      58,
-      5,
+      59,
+      4,
       1,
       0
     ],
@@ -68,20 +68,20 @@
   "training_samples": 5365,
   "test_samples": 1342,
   "feature_importance": {
-    "Text Similarity": 0.33130014505681954,
-    "Experience Years": 0.09874379845946515,
-    "Experience Ratio": 0.09859804901960119,
-    "Meets Experience": 0.006156343404870138,
+    "Text Similarity": 0.3315010579375592,
+    "Experience Years": 0.0983239378721264,
+    "Experience Ratio": 0.09897565364012506,
+    "Meets Experience": 0.006155061903401725,
     "Skill Match Ratio": 0.0,
     "Skill Coverage": 0.0,
-    "Total Skills": 0.1356448804855497,
+    "Total Skills": 0.13581950987887006,
     "Matching Skills": 0.0,
-    "Education Level": 0.007863212228743355,
-    "Certifications": 0.07910096705450408,
-    "Industry Keywords": 0.12073325504272453,
-    "Communication Score": 0.04898249372369077,
-    "Achievements": 0.05506293640193602,
-    "Languages": 0.009863982984255157,
-    "Location Match": 0.007949936137840487
+    "Education Level": 0.007854222961396786,
+    "Certifications": 0.0784339698698729,
+    "Industry Keywords": 0.12107343378170761,
+    "Communication Score": 0.049034628375751003,
+    "Achievements": 0.05500282528640964,
+    "Languages": 0.009847218198049566,
+    "Location Match": 0.007978480294729933
   }
 }
