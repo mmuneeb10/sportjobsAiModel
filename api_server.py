@@ -123,6 +123,44 @@ def evaluate_cv():
             if result is None:
                 return jsonify({"error": "Failed to evaluate CV"}), 500
             
+            # Transform the prediction to only have 'reject' or 'shortlist'
+            # If the current model still returns old statuses, map them
+            original_prediction = result.get('prediction', '').upper()
+            
+            # Map INTERVIEW, ACCEPT, and SHORTLIST to 'shortlist'
+            # Map REJECT to 'reject'
+            if original_prediction in ['SHORTLIST', 'INTERVIEW', 'ACCEPT']:
+                result['prediction'] = 'shortlist'
+            else:
+                result['prediction'] = 'reject'
+            
+            # Update probabilities to reflect binary decision
+            if 'probabilities' in result:
+                # If old model with 4 classes
+                if 'INTERVIEW' in result['probabilities'] or 'ACCEPT' in result['probabilities']:
+                    shortlist_prob = (
+                        result['probabilities'].get('SHORTLIST', 0) +
+                        result['probabilities'].get('INTERVIEW', 0) +
+                        result['probabilities'].get('ACCEPT', 0)
+                    )
+                    reject_prob = result['probabilities'].get('REJECT', 0)
+                    
+                    # Normalize probabilities
+                    total_prob = shortlist_prob + reject_prob
+                    if total_prob > 0:
+                        result['probabilities'] = {
+                            'reject': reject_prob / total_prob,
+                            'shortlist': shortlist_prob / total_prob
+                        }
+                        # Update confidence based on new binary decision
+                        result['confidence'] = max(result['probabilities'].values())
+                else:
+                    # Already binary model, just ensure lowercase keys
+                    result['probabilities'] = {
+                        'reject': result['probabilities'].get('REJECT', 0),
+                        'shortlist': result['probabilities'].get('SHORTLIST', 0)
+                    }
+            
             # Return the result
             return jsonify({
                 "success": True,

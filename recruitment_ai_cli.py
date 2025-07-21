@@ -124,7 +124,7 @@ class RecruitmentAICLI:
         print(f"{'=' * 60}\n")
         
         # Count by stage
-        stage_counts = {'REJECT': 0, 'SHORTLIST': 0, 'INTERVIEW': 0, 'ACCEPT': 0}
+        stage_counts = {'REJECT': 0, 'SHORTLIST': 0}
         for result in results:
             stage_counts[result['prediction']] += 1
         

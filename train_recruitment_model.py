@@ -61,8 +61,17 @@ class RecruitmentModelTrainer:
             logger.warning("No CV data found. Creating sample data for demonstration...")
             df = self._create_sample_data()
         
+        # Convert to binary classification
+        # Map INTERVIEW, ACCEPT, and old SHORTLIST to SHORTLIST
+        # Keep REJECT as REJECT
+        logger.info("Converting to binary classification...")
+        original_distribution = df['stage'].value_counts()
+        
+        df['stage'] = df['stage'].apply(lambda x: 'SHORTLIST' if x in ['SHORTLIST', 'INTERVIEW', 'ACCEPT'] else 'REJECT')
+        
+        logger.info(f"Original stage distribution:\n{original_distribution}")
+        logger.info(f"Binary stage distribution:\n{df['stage'].value_counts()}")
         logger.info(f"Loaded {len(df)} CV samples from {len(job_folders)} jobs")
-        logger.info(f"Stage distribution:\n{df['stage'].value_counts()}")
         
         self.training_data = df
         return df
@@ -72,29 +81,21 @@ class RecruitmentModelTrainer:
         # This would be replaced with actual CV data
         sample_data = []
         
-        stages = ['REJECT', 'SHORTLIST', 'INTERVIEW', 'ACCEPT']
-        stage_distributions = [0.4, 0.3, 0.2, 0.1]  # Typical funnel
+        stages = ['REJECT', 'SHORTLIST']
+        stage_distributions = [0.6, 0.4]  # Binary classification
         
         for i in range(1000):  # Generate 1000 samples
             stage = np.random.choice(stages, p=stage_distributions)
             
             # Create realistic features based on stage
             if stage == 'REJECT':
-                exp_years = np.random.randint(0, 3)
-                skills = np.random.randint(1, 5)
+                exp_years = np.random.randint(0, 5)
+                skills = np.random.randint(1, 6)
                 education = np.random.choice([0, 1], p=[0.7, 0.3])
-            elif stage == 'SHORTLIST':
-                exp_years = np.random.randint(2, 7)
-                skills = np.random.randint(3, 8)
-                education = np.random.choice([1, 2], p=[0.6, 0.4])
-            elif stage == 'INTERVIEW':
-                exp_years = np.random.randint(5, 12)
-                skills = np.random.randint(5, 10)
-                education = np.random.choice([2, 3], p=[0.7, 0.3])
-            else:  # ACCEPT
-                exp_years = np.random.randint(8, 20)
-                skills = np.random.randint(8, 15)
-                education = np.random.choice([2, 3, 4], p=[0.3, 0.5, 0.2])
+            else:  # SHORTLIST
+                exp_years = np.random.randint(3, 15)
+                skills = np.random.randint(5, 12)
+                education = np.random.choice([1, 2, 3], p=[0.3, 0.5, 0.2])
             
             sample = {
                 'stage': stage,
@@ -167,7 +168,7 @@ class RecruitmentModelTrainer:
         y_pred, y_proba = self.model.predict_ensemble(X_test)
         
         # Determine actual stage names based on the classes present
-        all_stage_names = ['REJECT', 'SHORTLIST', 'INTERVIEW', 'ACCEPT']
+        all_stage_names = ['REJECT', 'SHORTLIST']
         unique_classes = np.unique(np.concatenate([y_test, y_pred]))
         stage_names = [all_stage_names[i] for i in unique_classes if i < len(all_stage_names)]
         

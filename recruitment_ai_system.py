@@ -36,7 +36,7 @@ class Candidate:
     experience_years: int
     skills: List[str]
     education: List[str]
-    current_stage: str  # REJECT, SHORTLIST, INTERVIEW, ACCEPT
+    current_stage: str  # REJECT, SHORTLIST
 
 
 class RecruitmentAISystem:
@@ -48,9 +48,7 @@ class RecruitmentAISystem:
         self.scaler = StandardScaler()
         self.stage_mapping = {
             'REJECT': 0,
-            'SHORTLIST': 1,
-            'INTERVIEW': 2,
-            'ACCEPT': 3
+            'SHORTLIST': 1
         }
         
     def parse_job_description(self, job_desc_path: str) -> JobPosting:
@@ -210,7 +208,7 @@ class RecruitmentAISystem:
             job = self.parse_job_description(str(job_desc_path))
             
             # Process CVs from each stage
-            for stage in ['REJECT', 'SHORTLIST', 'INTERVIEW', 'ACCEPT']:
+            for stage in ['REJECT', 'SHORTLIST']:
                 stage_folder = job_folder / stage
                 if not stage_folder.exists():
                     continue

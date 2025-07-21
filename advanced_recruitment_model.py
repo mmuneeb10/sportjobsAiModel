@@ -49,7 +49,7 @@ class BERTFeatureExtractor:
 class RecruitmentNeuralNetwork(nn.Module):
     """Custom neural network for recruitment decisions"""
     
-    def __init__(self, input_size: int, hidden_sizes: List[int], num_classes: int = 4):
+    def __init__(self, input_size: int, hidden_sizes: List[int], num_classes: int = 2):
         super(RecruitmentNeuralNetwork, self).__init__()
         
         layers = []
@@ -218,9 +218,7 @@ class AdvancedRecruitmentModel:
         
         stage_mapping = {
             'REJECT': 0,
-            'SHORTLIST': 1,
-            'INTERVIEW': 2,
-            'ACCEPT': 3
+            'SHORTLIST': 1
         }
         
         for idx, row in cvs_df.iterrows():
@@ -342,7 +340,7 @@ class AdvancedRecruitmentModel:
         """Explain the recruitment decision"""
         features = self.extract_advanced_features(cv_data, job_data)
         
-        stage_names = {0: 'REJECT', 1: 'SHORTLIST', 2: 'INTERVIEW', 3: 'ACCEPT'}
+        stage_names = {0: 'REJECT', 1: 'SHORTLIST'}
         
         explanation = {
             'decision': stage_names[prediction],
@@ -461,9 +459,7 @@ class RecruitmentPipeline:
             'confidence': float(np.max(probabilities[0])),
             'probabilities': {
                 'REJECT': float(probabilities[0][0]),
-                'SHORTLIST': float(probabilities[0][1]),
-                'INTERVIEW': float(probabilities[0][2]),
-                'ACCEPT': float(probabilities[0][3])
+                'SHORTLIST': float(probabilities[0][1])
             },
             'explanation': explanation,
             'candidate_summary': {

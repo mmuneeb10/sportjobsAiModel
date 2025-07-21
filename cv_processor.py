@@ -863,7 +863,7 @@ class BatchCVProcessor:
         files_skipped = 0
         files_failed = 0
         
-        for stage in ['REJECT', 'SHORTLIST', 'INTERVIEW', 'ACCEPT']:
+        for stage in ['REJECT', 'SHORTLIST']:
             stage_folder = job_folder / stage
             if not stage_folder.exists():
                 continue
