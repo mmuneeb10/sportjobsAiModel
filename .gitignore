@@ -10,3 +10,5 @@ data/
 __pycache__
 venv
 cv_extractor.py
+extract_candidates_from_db.py
+newJobs/

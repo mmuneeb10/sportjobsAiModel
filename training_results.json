@@ -1,59 +1,59 @@
 {
-  "accuracy": 0.803885853066181,
+  "accuracy": 0.8140877598152425,
   "classification_report": {
     "REJECT": {
-      "precision": 0.8131728942368588,
-      "recall": 0.9786585365853658,
-      "f1-score": 0.8882739536492563,
-      "support": 1312.0
+      "precision": 0.820156910078455,
+      "recall": 0.982646420824295,
+      "f1-score": 0.8940789473684211,
+      "support": 1383.0
     },
     "SHORTLIST": {
-      "precision": 0.5882352941176471,
-      "recall": 0.11940298507462686,
-      "f1-score": 0.19851116625310175,
-      "support": 335.0
+      "precision": 0.68,
+      "recall": 0.14613180515759314,
+      "f1-score": 0.24056603773584906,
+      "support": 349.0
     },
-    "accuracy": 0.803885853066181,
+    "accuracy": 0.8140877598152425,
     "macro avg": {
-      "precision": 0.7007040941772529,
-      "recall": 0.5490307608299964,
-      "f1-score": 0.5433925599511791,
-      "support": 1647.0
+      "precision": 0.7500784550392275,
+      "recall": 0.5643891129909441,
+      "f1-score": 0.5673224925521351,
+      "support": 1732.0
     },
     "weighted avg": {
-      "precision": 0.7674205590577842,
-      "recall": 0.803885853066181,
-      "f1-score": 0.747976118932977,
-      "support": 1647.0
+      "precision": 0.7919151308536393,
+      "recall": 0.8140877598152425,
+      "f1-score": 0.762395341443613,
+      "support": 1732.0
     }
   },
   "confusion_matrix": [
     [
-      1284,
-      28
+      1359,
+      24
     ],
     [
-      295,
-      40
+      298,
+      51
     ]
   ],
-  "training_samples": 6587,
-  "test_samples": 1647,
+  "training_samples": 6924,
+  "test_samples": 1732,
   "feature_importance": {
-    "Text Similarity": 0.3410081250651402,
-    "Experience Years": 0.09520234347587786,
-    "Experience Ratio": 0.09701906649448352,
-    "Meets Experience": 0.006043573245656067,
+    "Text Similarity": 0.3363068599942954,
+    "Experience Years": 0.09754945418413034,
+    "Experience Ratio": 0.09717519400998696,
+    "Meets Experience": 0.006392640401539745,
     "Skill Match Ratio": 0.0,
     "Skill Coverage": 0.0,
-    "Total Skills": 0.13182753952113552,
+    "Total Skills": 0.13315733839998092,
     "Matching Skills": 0.0,
-    "Education Level": 0.009086286319480861,
-    "Certifications": 0.07631723048631736,
-    "Industry Keywords": 0.12310833294272068,
-    "Communication Score": 0.04606878542402885,
-    "Achievements": 0.054494012913319935,
-    "Languages": 0.010592718574182765,
-    "Location Match": 0.00923198553765662
+    "Education Level": 0.00845774542343484,
+    "Certifications": 0.07548886814787877,
+    "Industry Keywords": 0.12499931942950944,
+    "Communication Score": 0.04623050266756677,
+    "Achievements": 0.05430658900126265,
+    "Languages": 0.011008368405683882,
+    "Location Match": 0.00892711993473053
   }
 }

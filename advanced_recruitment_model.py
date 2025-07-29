@@ -336,6 +336,16 @@ class AdvancedRecruitmentModel:
         
         return ensemble_pred, ensemble_prob
     
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Make predictions"""
+        pred, _ = self.predict_ensemble(X)
+        return pred
+    
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Get prediction probabilities"""
+        _, probs = self.predict_ensemble(X)
+        return probs
+    
     def explain_decision(self, cv_data: Dict, job_data: Dict, prediction: int) -> Dict:
         """Explain the recruitment decision"""
         features = self.extract_advanced_features(cv_data, job_data)
@@ -381,6 +391,58 @@ class AdvancedRecruitmentModel:
             })
         
         return explanation
+    
+    def fine_tune_models(self, X_new: np.ndarray, y_new: np.ndarray, epochs: int = 10):
+        """Fine-tune existing models with new data using incremental learning"""
+        # Scale features
+        X_new_scaled = self.scaler.transform(X_new)
+        
+        # Get existing training data predictions to preserve knowledge
+        # For tree-based models, we need to combine old and new data
+        
+        # Fine-tune each model
+        for name, model in self.models.items():
+            print(f"Fine-tuning {name} model...")
+            
+            if name == 'mlp':
+                # MLPClassifier supports partial_fit for incremental learning
+                classes = np.array([0, 1])  # Binary classification
+                model.set_params(warm_start=True)
+                for epoch in range(epochs):
+                    model.partial_fit(X_new_scaled, y_new, classes=classes)
+                    
+            elif name == 'rf':
+                # Random Forest with warm start
+                current_estimators = model.n_estimators
+                model.set_params(
+                    warm_start=True, 
+                    n_estimators=current_estimators + 20  # Add more trees
+                )
+                model.fit(X_new_scaled, y_new)
+                
+            elif name == 'gb':
+                # Gradient Boosting with warm start
+                current_estimators = model.n_estimators
+                model.set_params(
+                    warm_start=True, 
+                    n_estimators=current_estimators + 20,  # Add more trees
+                    subsample=0.8  # Use subsample to prevent overfitting
+                )
+                model.fit(X_new_scaled, y_new)
+                
+            elif name == 'xgb':
+                # XGBoost continued training
+                # Get current booster
+                try:
+                    # Train additional rounds
+                    dtrain = xgb.DMatrix(X_new_scaled, label=y_new)
+                    model.get_booster().update(dtrain, model.n_estimators)
+                except:
+                    # If update fails, retrain
+                    model.n_estimators += 20
+                    model.fit(X_new_scaled, y_new)
+        
+        print(f"Fine-tuning completed with {len(X_new)} new samples")
     
     def save_model(self, path: str):
         """Save all models and preprocessors"""
